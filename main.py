@@ -429,6 +429,15 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except arquivo.BaseInvalida as erro:
+        # A base existe mas não pode ser lida. Recuso abrir de propósito: se
+        # eu abrisse com base vazia, a primeira gravação sobrescreveria o
+        # arquivo e o estrago viraria permanente.
+        print(f"\n  ! A base de dados está corrompida: {erro}")
+        print(f"  ! Arquivo: {arquivo.ARQUIVO_DADOS}")
+        print("  ! O programa não vai abrir, para não sobrescrever dados bons.")
+        print("  ! Corrija o arquivo, ou mova-o para fora da pasta")
+        print("    e o programa começa uma base nova.\n")
     except (KeyboardInterrupt, EOFError):
         # Ctrl+C ou fim de entrada: encerra limpo em vez de despejar um
         # traceback vermelho de dez linhas.

@@ -32,6 +32,16 @@ from classificacoes import (
 #
 # __file__ é o caminho deste próprio arquivo. Pegando a pasta dele, o
 # inventario.json fica sempre ao lado do código, rode eu de onde rodar.
+class BaseInvalida(Exception):
+    """
+    A base em disco está corrompida ou foi adulterada.
+
+    Crio uma exceção própria para separar "o arquivo de dados está ruim" de
+    qualquer outro erro do Python. Assim o main.py consegue tratar só este
+    caso e dar uma mensagem útil, em vez de despejar um traceback.
+    """
+
+
 # ===========================================================================
 PASTA_DO_PROJETO = os.path.dirname(os.path.abspath(__file__))
 ARQUIVO_DADOS = os.path.join(PASTA_DO_PROJETO, "inventario.json")
@@ -87,43 +97,57 @@ def salvar(equipamentos, falhas):
 
 def carregar():
     """
-    Devolve (equipamentos, falhas): dois dicionários prontos para uso.
-    Se o arquivo ainda não existe, devolve dois vazios - primeira execução
-    do programa não é erro.
+    Devolve (equipamentos, falhas). Arquivo inexistente devolve dois vazios -
+    primeira execução do programa não é erro.
+
+    Levanta BaseInvalida se o arquivo existir mas estiver ilegível ou fora do
+    formato. Prefiro recusar a abrir a carregar pela metade: com base parcial,
+    a primeira gravação sobrescreveria o arquivo bom com dados incompletos.
+    Perder a última alteração é aceitável; perder a base inteira não é.
     """
     if not os.path.exists(ARQUIVO_DADOS):
         return {}, {}
 
-    with open(ARQUIVO_DADOS, "r", encoding="utf-8") as f:
-        dados = json.load(f)
+    try:
+        with open(ARQUIVO_DADOS, "r", encoding="utf-8") as f:
+            dados = json.load(f)
+    except json.JSONDecodeError as erro:
+        raise BaseInvalida(f"não é um JSON válido ({erro})") from erro
+    except OSError as erro:
+        raise BaseInvalida(f"não foi possível abrir o arquivo ({erro})") from erro
 
-    equipamentos = {}
-    for chave, registro in dados.get("equipamentos", {}).items():
-        # ===================================================================
-        # A ARMADILHA DO JSON (requisito 3)
-        # O requisito exige identificador INTEIRO. Mas o JSON devolve a chave
-        # como TEXTO: eu gravei 1 e recebo "1". Sem este int(), buscar pelo
-        # id 1 nunca acharia nada - e sem levantar erro nenhum, que é o pior
-        # tipo de bug, o silencioso.
-        # ===================================================================
-        equipamentos[int(chave)] = {
-            "hostname":    registro["hostname"],
-            "custodiante": registro["custodiante"],
-            "lotacao":     registro["lotacao"],
-            "descricao":   registro["descricao"],
-            # inteiro -> Enum: o caminho inverso do que fiz em salvar()
-            "categoria":   CategoriaEquipamento(registro["categoria"]),
-        }
+    # A conversão inteira vai dentro de um try. Campo faltando, código de Enum
+    # inválido ou chave não numérica levam todos à mesma conclusão: a base não
+    # está confiável. Não adianta tratar cada um de um jeito diferente.
+    #
+    # Uso dados["equipamentos"] e não dados.get(...): com o .get(), um arquivo
+    # sem essa chave carregaria como base vazia, e a primeira gravação apagaria
+    # tudo em silêncio. Falta de chave tem que ser erro.
+    try:
+        equipamentos = {}
+        for chave, registro in dados["equipamentos"].items():
+            # int(chave): o JSON devolve a chave como texto (ver salvar()).
+            equipamentos[int(chave)] = {
+                "hostname":    registro["hostname"],
+                "custodiante": registro["custodiante"],
+                "lotacao":     registro["lotacao"],
+                "descricao":   registro["descricao"],
+                "categoria":   CategoriaEquipamento(registro["categoria"]),
+            }
 
-    falhas = {}
-    for chave, registro in dados.get("falhas", {}).items():
-        falhas[int(chave)] = {
-            "equipamento_id": registro["equipamento_id"],
-            "descricao":      registro["descricao"],
-            "origem":         OrigemFalha(registro["origem"]),
-            "gravidade":      NivelGravidade(registro["gravidade"]),
-            "situacao":       SituacaoTratamento(registro["situacao"]),
-        }
+        falhas = {}
+        for chave, registro in dados["falhas"].items():
+            falhas[int(chave)] = {
+                "equipamento_id": registro["equipamento_id"],
+                "descricao":      registro["descricao"],
+                "origem":         OrigemFalha(registro["origem"]),
+                "gravidade":      NivelGravidade(registro["gravidade"]),
+                "situacao":       SituacaoTratamento(registro["situacao"]),
+            }
+    except (KeyError, ValueError, TypeError, AttributeError) as erro:
+        raise BaseInvalida(
+            f"conteúdo fora do formato esperado "
+            f"({type(erro).__name__}: {erro})") from erro
 
     return equipamentos, falhas
 
