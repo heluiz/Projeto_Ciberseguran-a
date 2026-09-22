@@ -3,8 +3,8 @@ main.py
 -------
 O programa em si: menu, leitura do que o usuário digita e tratamento de erros.
 
-Este é o único arquivo que conversa com o usuário. Os outros três não têm
-nenhum input() nem print() - é o que permitiu testar cada um isoladamente.
+Este é o único arquivo que conversa com o usuário. Nenhum dos outros tem
+input() nem print() - é o que permitiu testar cada um isoladamente.
 
 Aqui também moram as regras que envolvem MAIS DE UM módulo, como a exclusão
 em cascata: nem equipamentos.py nem falhas.py enxergam os dados um do outro,
@@ -96,6 +96,20 @@ def confirmar(mensagem):
 # ===========================================================================
 # EXIBIÇÃO
 # ===========================================================================
+def coluna(texto, largura):
+    """
+    Encaixa o texto numa coluna de largura fixa.
+
+    Sem isso, um hostname mais longo que a coluna empurra todo o resto da
+    linha para a direita e a tabela perde o alinhamento. Corto em
+    largura - 2 e marco com ".." para o leitor saber que foi cortado.
+    """
+    texto = str(texto)
+    if len(texto) > largura:
+        return texto[:largura - 2] + ".."
+    return texto.ljust(largura)
+
+
 def mostrar_equipamento(id_equipamento, registro):
     print(f"\n  ID ............ {id_equipamento}")
     print(f"  Hostname ...... {registro['hostname']}")
@@ -194,13 +208,18 @@ def acao_listar_todos(base_equipamentos, base_falhas):
         print("\n  Nenhum equipamento cadastrado ainda.")
         return
 
-    print(f"\n  {'ID':<4} {'HOSTNAME':<20} {'CATEGORIA':<22} {'LOTACAO':<16} VULNS")
-    print("  " + "-" * 74)
+    # Larguras num lugar so: cabecalho, linha de tracos e linhas de dados
+    # usam os mesmos numeros, entao nao tem como um sair diferente do outro.
+    cabecalho = (f"  {coluna('ID', 4)} {coluna('HOSTNAME', 20)} "
+                 f"{coluna('CATEGORIA', 22)} {coluna('LOTACAO', 16)} VULNS")
+    print("\n" + cabecalho)
+    print("  " + "-" * (len(cabecalho) - 2))
     for id_equipamento, registro in sorted(base_equipamentos.items()):
         quantas = len(falhas.listar_por_equipamento(base_falhas, id_equipamento))
-        print(f"  {id_equipamento:<4} {registro['hostname']:<20} "
-              f"{registro['categoria'].rotulo:<22} "
-              f"{registro['lotacao']:<16} {quantas}")
+        print(f"  {coluna(id_equipamento, 4)} "
+              f"{coluna(registro['hostname'], 20)} "
+              f"{coluna(registro['categoria'].rotulo, 22)} "
+              f"{coluna(registro['lotacao'], 16)} {quantas}")
 
 
 def acao_buscar(base_equipamentos, base_falhas):

@@ -48,6 +48,22 @@ ARQUIVO_DADOS = os.path.join(PASTA_DO_PROJETO, "inventario.json")
 
 
 # ===========================================================================
+# MARCA D'AGUA DOS IDENTIFICADORES
+#
+# Guarda o MAIOR id ja entregue para cada colecao - nao o maior que existe
+# agora, e sim o maior que ja existiu. E o que impede um id de ser
+# reaproveitado depois que o registro dele foi excluido.
+#
+# Por que aqui, e nao dentro do dicionario de dados? Porque isto e estado
+# PERSISTIDO: precisa ser gravado junto com os registros e restaurado na
+# proxima execucao. Este modulo e justamente o dono do que vai para o disco.
+#
+# Comeca zerado. carregar() restaura do arquivo e salvar() grava de volta.
+# ===========================================================================
+_marca_alta = {"equipamentos": 0, "falhas": 0}
+
+
+# ===========================================================================
 # REQUISITO 3 - gravar em arquivo de texto.
 #
 # Uso JSON, que é arquivo de texto puro (abre no Bloco de Notas e dá para
@@ -58,7 +74,17 @@ ARQUIVO_DADOS = os.path.join(PASTA_DO_PROJETO, "inventario.json")
 # Enum não vai direto para JSON, então gravo o .value (o código inteiro).
 # ===========================================================================
 def salvar(equipamentos, falhas):
-    dados = {"equipamentos": {}, "falhas": {}}
+    # Os contadores vao junto com os registros. Uso max(...) por seguranca:
+    # se por algum motivo a marca estiver atrasada em relacao aos ids que
+    # existem, grava o maior dos dois e a base continua coerente.
+    dados = {
+        "equipamentos": {},
+        "falhas": {},
+        "ultimo_id_equipamento": max(_marca_alta["equipamentos"],
+                                     max(equipamentos, default=0)),
+        "ultimo_id_falha": max(_marca_alta["falhas"],
+                               max(falhas, default=0)),
+    }
 
     for id_equip, registro in equipamentos.items():
         # str(id_equip) porque JSON só aceita texto como chave.
@@ -149,21 +175,47 @@ def carregar():
             f"conteúdo fora do formato esperado "
             f"({type(erro).__name__}: {erro})") from erro
 
+    # Restaura a marca d'agua. Uso .get() com reserva de proposito, ao
+    # contrario de dados["equipamentos"]: arquivo antigo, gravado antes deste
+    # recurso existir, nao tem esta chave - e a reserva (o maior id que
+    # existe) e exatamente o comportamento que o programa tinha antes. Falta
+    # de contador nao corrompe nada; falta de "equipamentos" corromperia.
+    _marca_alta["equipamentos"] = max(dados.get("ultimo_id_equipamento", 0),
+                                      max(equipamentos, default=0))
+    _marca_alta["falhas"] = max(dados.get("ultimo_id_falha", 0),
+                                max(falhas, default=0))
+
     return equipamentos, falhas
 
 
-def proximo_id(colecao):
+def _proximo_id(colecao, nome_colecao):
     """
-    Próximo identificador livre: dicionário vazio devolve 1, senão maior + 1.
+    Entrega um identificador que NUNCA se repete, nem depois de exclusões.
 
-    Não reaproveito id de registro excluído de propósito. Se o equipamento 3
-    foi apagado e eu desse 3 para o próximo, qualquer anotação feita fora do
-    sistema apontando para "equipamento 3" passaria a apontar para a coisa
-    errada.
+    A versão ingênua seria max(colecao) + 1. Ela tem um defeito: com {1, 2},
+    apagando o 2, max({1}) + 1 devolve 2 outra vez. O número volta a
+    circular, e uma anotação externa apontando para "equipamento 2" passa a
+    apontar para outra máquina.
+
+    A correção é comparar com a marca d'água - o maior id já entregue,
+    lembrado mesmo depois que o registro sumiu. Comparo com o maior id
+    existente também, como rede de segurança para uma base montada à mão.
     """
-    if not colecao:
-        return 1
-    return max(colecao) + 1
+    maior_existente = max(colecao, default=0)
+    novo = max(maior_existente, _marca_alta[nome_colecao]) + 1
+    _marca_alta[nome_colecao] = novo
+    return novo
+
+
+def proximo_id_equipamento(equipamentos):
+    """Próximo id de equipamento. Duas funções nomeadas em vez de uma com
+    parâmetro de texto: a chamada fica legível e não há nome mágico solto."""
+    return _proximo_id(equipamentos, "equipamentos")
+
+
+def proximo_id_falha(falhas):
+    """Próximo id de vulnerabilidade."""
+    return _proximo_id(falhas, "falhas")
 
 
 # ===========================================================================
@@ -195,7 +247,7 @@ if __name__ == "__main__":
     print(f"  id {chave} - tipo {type(chave).__name__}  (tem que ser 'int')")
     print(f"  categoria: {lidos_equip[1]['categoria'].rotulo}")
     print(f"  gravidade: {lidos_falhas[1]['gravidade'].rotulo}")
-    print(f"  proximo id livre: {proximo_id(lidos_equip)}")
+    print(f"  proximo id livre: {proximo_id_equipamento(lidos_equip)}")
 
     # assert: se a comparação for falsa, o programa para e avisa.
     # É a forma mais curta de testar que salvar() e carregar() são de fato
@@ -203,3 +255,19 @@ if __name__ == "__main__":
     assert lidos_equip == equipamentos, "os dados lidos diferem dos gravados"
     assert lidos_falhas == falhas, "as falhas lidas diferem das gravadas"
     print("\nOK - o que saiu e o que voltou sao identicos.")
+
+    # --- o id nao volta a circular, nem depois de fechar o programa ---
+    base = dict(lidos_equip)
+    id_a = proximo_id_equipamento(base)
+    base[id_a] = dict(base[1])
+    del base[id_a]                      # excluiu o de maior id
+    salvar(base, lidos_falhas)
+
+    _marca_alta["equipamentos"] = 0     # simula o programa reiniciando
+    base, _ = carregar()
+    id_b = proximo_id_equipamento(base)
+
+    print(f"\nEntreguei o id {id_a}, exclui o registro e reiniciei.")
+    print(f"O proximo id foi {id_b} - o {id_a} nao voltou a circular.")
+    assert id_b > id_a, "o identificador foi reaproveitado"
+    print("\nOK - identificadores nao se repetem.")

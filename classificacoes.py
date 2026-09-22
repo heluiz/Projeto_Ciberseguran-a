@@ -5,7 +5,7 @@ Guarda as listas fixas do sistema: que tipos de equipamento existem, de onde
 vem uma falha, qual a gravidade dela e em que situação está o tratamento.
 
 Por que um arquivo só para isso?
-Essas listas não mudam durante a execução e são usadas pelos outros três
+Essas listas não mudam durante a execução e são usadas pelos demais
 módulos. Isolando aqui, se um dia eu precisar acrescentar um tipo de
 equipamento, mexo em um lugar só e o resto do programa acompanha sozinho.
 
