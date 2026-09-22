@@ -28,9 +28,9 @@ diretamente (`python equipamentos.py`, por exemplo).
 | --- | --- |
 | `classificacoes.py` | Enums: tipo de equipamento, origem, gravidade e situação da falha |
 | `formatacao.py` | Padronização de maiúsculas e minúsculas do texto digitado |
-| `arquivo.py` | Leitura e gravação da base em JSON, com escrita atômica |
+| `arquivo.py` | Gravação e leitura da base em JSON, validação na carga e geração de identificadores |
 | `equipamentos.py` | CRUD dos equipamentos de TI |
-| `falhas.py` | Cadastro, listagem e exclusão em cascata das vulnerabilidades |
+| `falhas.py` | Cadastro, listagem, correção e exclusão das vulnerabilidades, incluindo a cascata |
 | `main.py` | Menu textual, tratamento de erros e coordenação entre módulos |
 
 ## Requisitos atendidos
@@ -48,6 +48,39 @@ diretamente (`python equipamentos.py`, por exemplo).
 | 9 | Uso de dicionário | Índice por ID e despacho do menu |
 | 10 | Repositório com múltiplas branches e merges | Histórico deste repositório |
 
+## Decisões além dos requisitos
+
+As escolhas abaixo não são exigidas pelo enunciado. Vieram da análise do
+problema e estão justificadas em comentário no próprio código.
+
+- **Gravação atômica.** A base é escrita num arquivo temporário que só então
+  substitui o definitivo (`os.replace`). Uma queda de energia no meio da
+  escrita custa a última alteração, nunca a base inteira.
+- **Validação na carga.** Arquivo corrompido ou adulterado faz o programa
+  recusar abrir, explicando o motivo. Abrir com base parcial seria pior: a
+  primeira gravação sobrescreveria o arquivo bom.
+- **Identificadores que não se repetem.** O maior id já entregue fica gravado
+  na própria base, então excluir um registro não devolve o número ao rodízio.
+  Uma anotação externa apontando para "equipamento 2" continua significando a
+  mesma máquina.
+- **Correção e exclusão de vulnerabilidades.** O enunciado pede apenas o
+  cadastro. Sem edição, um erro de digitação na severidade — que distorce a
+  priorização, razão de ser do inventário — só teria conserto excluindo o
+  equipamento inteiro e perdendo as demais vulnerabilidades dele.
+- **Padronização do texto digitado.** Hostname em caixa alta, responsável e
+  lotação com iniciais maiúsculas, descrição com a primeira letra maiúscula.
+  A regra só formata quando o operador escreveu tudo em caixa alta ou tudo em
+  baixa; texto com maiúsculas e minúsculas misturadas é respeitado, o que
+  preserva acrônimos como TI, CPD e RDP.
+
+## Limitações conhecidas
+
+- O programa assume **um operador por vez**. Duas instâncias abertas
+  simultaneamente gravam por cima uma da outra. Num sistema real isso pediria
+  um banco de dados com controle de concorrência.
+- A base é gravada em **texto claro**, sem cifragem nem controle de acesso.
+  A mitigação adotada aqui é não versionar o arquivo.
+
 ## Base de dados
 
 Os dados ficam em `inventario.json`, criado na primeira execução ao lado do
@@ -57,11 +90,10 @@ justamente o que não se publica.
 
 ## Desenvolvimento
 
-Cada módulo foi desenvolvido em uma branch própria (`feature/persistencia`,
-`feature/equipamentos`, `feature/falhas`, `feature/menu`) e integrado à `main`
-por merge. O fast-forward está desabilitado no repositório para que cada
-integração gere um commit de merge e o histórico preserve a topologia das
-branches:
+Cada módulo e cada correção foram desenvolvidos numa branch própria e
+integrados à `main` por merge. O fast-forward está desabilitado no repositório
+(`git config merge.ff false`) para que toda integração gere um commit de merge
+e o histórico preserve a topologia das branches:
 
 ```
 git log --oneline --graph --all
