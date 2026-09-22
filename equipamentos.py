@@ -17,6 +17,7 @@ Atende aos requisitos 3, 4, 5 e 6.
 
 from arquivo import proximo_id_equipamento
 import formatacao
+import string
 
 
 # Campos que o usuário pode alterar depois do cadastro.
@@ -24,6 +25,61 @@ import formatacao
 # vulnerabilidades que apontam para ele ficariam órfãs, apontando para um
 # equipamento que não existe mais. Identificador é imutável por natureza.
 CAMPOS_EDITAVEIS = ("hostname", "custodiante", "lotacao", "descricao", "categoria")
+
+
+# ===========================================================================
+# FORMATO DO HOSTNAME
+#
+# Hostname é o nome da máquina na rede, e a rede tem regras para ele. Estas
+# vêm das normas que definem nome de máquina (RFC 952 e RFC 1123) e da
+# documentação da Microsoft para redes Windows:
+#
+#   - só letras sem acento, números e hífen: nada de espaço, ponto, barra,
+#     sublinhado ou acento;
+#   - não começa nem termina com hífen;
+#   - no máximo 63 caracteres, o limite de um nome no DNS;
+#   - não pode ser só números: o Active Directory recusa, e um nome só de
+#     dígitos se confunde com endereço IP.
+#
+# Ponto fica de fora porque o campo é o nome da máquina (PC-CARTORIO-01),
+# não o endereço completo no domínio (pc-cartorio-01.delegacia.local).
+#
+# O Windows ainda corta o nome antigo de rede (NetBIOS) em 15 caracteres.
+# Não imponho esse limite porque o inventário também tem roteador e
+# servidor, que nem sempre são Windows.
+# ===========================================================================
+_CARACTERES_HOSTNAME = set(string.ascii_letters + string.digits + "-")
+
+
+def problema_no_hostname(hostname):
+    """
+    Devolve None se o hostname é válido, ou uma frase dizendo o que está
+    errado.
+
+    Por que devolver a frase em vez de levantar erro? Porque o main.py usa
+    esta função para perguntar de novo NA HORA em que o operador digita -
+    sem obrigá-lo a preencher os outros campos para só então descobrir o
+    problema. E cadastrar() e atualizar() usam a mesma função para recusar
+    o dado de qualquer forma. A regra mora num lugar só.
+
+    A ordem das checagens importa: os caracteres vêm antes do isdigit(),
+    porque isdigit() aceita dígitos de outros alfabetos, como o "²".
+    """
+    h = hostname.strip()
+    if not h:
+        return "nao pode ficar vazio"
+    if len(h) > 63:
+        return f"tem {len(h)} caracteres, o maximo e 63"
+    invalidos = sorted(set(h) - _CARACTERES_HOSTNAME)
+    if invalidos:
+        mostrados = " ".join(repr(c) for c in invalidos)
+        return (f"caractere(s) nao permitido(s): {mostrados} - use apenas "
+                f"letras sem acento, numeros e hifen")
+    if h[0] == "-" or h[-1] == "-":
+        return "nao pode comecar nem terminar com hifen"
+    if h.isdigit():
+        return "nao pode ser composto so de numeros"
+    return None
 
 
 def _hostname_existe(equipamentos, hostname, ignorar_id=None):
@@ -77,6 +133,9 @@ def cadastrar(equipamentos, hostname, custodiante, lotacao, descricao, categoria
     enunciado não exige essa checagem, mas ela faz o sistema representar o
     mundo corretamente - e é uma decisão que eu sei defender.
     """
+    problema = problema_no_hostname(hostname)
+    if problema:
+        raise ValueError(f"Hostname invalido: {problema}")
     if _hostname_existe(equipamentos, hostname):
         raise ValueError(f"Ja existe equipamento com o hostname '{hostname}'")
 
@@ -147,6 +206,9 @@ def atualizar(equipamentos, id_equipamento, alteracoes):
         if campo not in CAMPOS_EDITAVEIS:
             raise ValueError(f"Campo nao editavel: '{campo}'")
         if campo == "hostname":
+            problema = problema_no_hostname(valor)
+            if problema:
+                raise ValueError(f"Hostname invalido: {problema}")
             if _hostname_existe(equipamentos, valor, ignorar_id=id_equipamento):
                 raise ValueError(f"Ja existe equipamento com o hostname '{valor}'")
         # Mesma normalizacao do cadastro, pela mesma funcao.
@@ -199,6 +261,18 @@ if __name__ == "__main__":
                   CategoriaEquipamento.SERVIDOR)
     except ValueError as erro:
         print(f"Duplicado recusado: {erro}")
+
+    # --- Formato do hostname (RFC 1123) ---
+    print()
+    for ruim in ("pc cartorio", "pc/cartorio", "-pc", "pc-", "12345", "pcção"):
+        try:
+            cadastrar(equipamentos, ruim, "X", "Y", "Z",
+                      CategoriaEquipamento.SERVIDOR)
+            raise AssertionError(f"aceitou hostname invalido: {ruim!r}")
+        except ValueError as erro:
+            print(f"Recusado {ruim!r:15} {erro}")
+    assert problema_no_hostname("10-ANDAR") is None, "recusou hostname valido"
+    print("Aceito   '10-ANDAR'      comeca com numero, mas nao e so numero")
 
     # --- Requisito 4 ---
     print(f"\nBusca por id 2: {buscar_por_id(equipamentos, 2)['hostname']}")

@@ -79,6 +79,16 @@ problema e estão justificadas em comentário no próprio código.
   seguida, situação e categoria como legenda na linha de baixo. A largura da
   coluna do identificador é calculada a partir da própria lista, para o
   alinhamento não quebrar quando os IDs passarem de um dígito.
+- **Hostname no formato que a rede aceita.** Só letras sem acento, números
+  e hífen; não começa nem termina com hífen; no máximo 63 caracteres; e não
+  pode ser só números. As regras vêm das RFC 952 e 1123, que definem nome de
+  máquina, e da documentação da Microsoft para Active Directory. O formato
+  é conferido na hora em que o operador digita, não depois de ele preencher
+  os outros campos.
+- **Nenhuma confirmação antes de gravar.** Toda ação que altera dados só
+  mostra a mensagem de sucesso depois que o dado já está no disco. E os
+  testes embutidos usam um arquivo temporário: rodar `python arquivo.py`
+  não toca na base real.
 - **Padronização do texto digitado.** Hostname em caixa alta, responsável e
   lotação com iniciais maiúsculas, descrição com a primeira letra maiúscula.
   A regra só formata quando o operador escreveu tudo em caixa alta ou tudo em

@@ -96,6 +96,27 @@ def confirmar(mensagem):
 # ===========================================================================
 # EXIBIÇÃO
 # ===========================================================================
+def ler_hostname(mensagem, obrigatorio=True):
+    """
+    Lê um hostname e só aceita um nome válido na rede.
+
+    A regra não mora aqui: pergunto ao equipamentos.py, que é o dono dela.
+    Assim o formato é recusado na hora em que o operador digita, e não
+    depois de ele preencher os outros quatro campos.
+
+    Vazio é aceito quando obrigatorio=False: na atualização, Enter
+    significa "manter o atual".
+    """
+    while True:
+        valor = ler_texto(mensagem, obrigatorio)
+        if not valor:
+            return valor
+        problema = equipamentos.problema_no_hostname(valor)
+        if problema is None:
+            return valor
+        print(f"  ! Hostname invalido: {problema}.")
+
+
 def coluna(texto, largura):
     """
     Encaixa o texto numa coluna de largura fixa.
@@ -175,9 +196,9 @@ def mostrar_falhas(base_falhas, id_equipamento):
 # ===========================================================================
 # AÇÕES DO MENU
 # ===========================================================================
-def cadastrar_falha_para(base_falhas, id_equipamento):
+def cadastrar_falha_para(base_equipamentos, base_falhas, id_equipamento):
     """
-    Pergunta os quatro campos de uma vulnerabilidade e registra.
+    Pergunta os quatro campos de uma vulnerabilidade, registra e grava.
 
     Esta função é usada em DOIS lugares: no cadastro do equipamento
     (requisito 3, "lista inicial de vulnerabilidades") e na opção de menu
@@ -191,13 +212,16 @@ def cadastrar_falha_para(base_falhas, id_equipamento):
 
     id_falha = falhas.cadastrar(base_falhas, id_equipamento, descricao,
                                 origem, gravidade, situacao)
+    # Grava ANTES de confirmar: a mensagem de sucesso so aparece quando o
+    # dado ja esta no disco.
+    arquivo.salvar(base_equipamentos, base_falhas)
     print(f"\n  Vulnerabilidade {id_falha} registrada.")
 
 
 def acao_cadastrar_equipamento(base_equipamentos, base_falhas):
     """REQUISITO 3."""
     print("\n--- CADASTRAR EQUIPAMENTO ---\n")
-    hostname    = ler_texto("  Hostname: ")
+    hostname    = ler_hostname("  Hostname: ")
     custodiante = ler_texto("  Custodiante (responsavel): ")
     lotacao     = ler_texto("  Lotacao (setor): ")
     descricao   = ler_texto("  Descricao: ")
@@ -212,15 +236,18 @@ def acao_cadastrar_equipamento(base_equipamentos, base_falhas):
         print(f"\n  ! {erro}")
         return
 
+    # Grava ANTES de confirmar. Antes, a gravacao so acontecia depois do laco
+    # de vulnerabilidades: se o usuario saisse no meio dele, via "cadastrado"
+    # na tela e o equipamento se perdia. Agora a regra vale para as seis
+    # acoes que alteram dados - nenhuma confirma o que ainda nao gravou.
+    arquivo.salvar(base_equipamentos, base_falhas)
     print(f"\n  Equipamento cadastrado com o ID {id_novo}.")
 
     # Fim do requisito 3: "...e lista inicial de vulnerabilidades associadas,
     # quando houver". O laço abaixo é essa parte - logo após criar o
     # equipamento, ofereço cadastrar vulnerabilidades, quantas quiser.
     while confirmar("\n  Cadastrar uma vulnerabilidade para este equipamento?"):
-        cadastrar_falha_para(base_falhas, id_novo)
-
-    arquivo.salvar(base_equipamentos, base_falhas)
+        cadastrar_falha_para(base_equipamentos, base_falhas, id_novo)
 
 
 def acao_listar_todos(base_equipamentos, base_falhas):
@@ -294,7 +321,8 @@ def acao_atualizar(base_equipamentos, base_falhas):
     # exemplo hostname duplicado) não deixa metade das mudanças aplicadas.
     alteracoes = {}
 
-    novo = ler_texto(f"  Hostname [{registro['hostname']}]: ", obrigatorio=False)
+    novo = ler_hostname(f"  Hostname [{registro['hostname']}]: ",
+                        obrigatorio=False)
     if novo:
         alteracoes["hostname"] = novo
 
@@ -368,8 +396,7 @@ def acao_cadastrar_falha(base_equipamentos, base_falhas):
         print(f"\n  ! Nenhum equipamento com o ID {id_equipamento}.")
         return
 
-    cadastrar_falha_para(base_falhas, id_equipamento)
-    arquivo.salvar(base_equipamentos, base_falhas)
+    cadastrar_falha_para(base_equipamentos, base_falhas, id_equipamento)
 
 
 def acao_ver_falhas(base_equipamentos, base_falhas):
