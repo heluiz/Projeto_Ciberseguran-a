@@ -46,7 +46,7 @@ def ler_texto(mensagem, obrigatorio=True):
         valor = input(mensagem).strip()
         if valor or not obrigatorio:
             return valor
-        print("  ! Este campo nao pode ficar vazio.")
+        print("  ! Este campo não pode ficar vazio.")
 
 
 def ler_inteiro(mensagem, opcional=False):
@@ -66,7 +66,7 @@ def ler_inteiro(mensagem, opcional=False):
             # int() levanta ValueError quando o texto não é número.
             # Capturo aqui em vez de deixar o programa quebrar na cara do
             # usuário.
-            print("  ! Digite apenas numeros.")
+            print("  ! Digite apenas números.")
 
 
 def ler_enum(mensagem, classe_enum, opcional=False):
@@ -79,13 +79,13 @@ def ler_enum(mensagem, classe_enum, opcional=False):
         print(f"    {item.value} - {item.rotulo}")
 
     while True:
-        codigo = ler_inteiro("  Codigo: ", opcional=opcional)
+        codigo = ler_inteiro("  Código: ", opcional=opcional)
         if codigo is None:
             return None
         try:
             return classe_enum(codigo)
         except ValueError:
-            print("  ! Codigo invalido. Escolha um da lista acima.")
+            print("  ! Código inválido. Escolha um da lista acima.")
 
 
 def confirmar(mensagem):
@@ -114,7 +114,7 @@ def ler_hostname(mensagem, obrigatorio=True):
         problema = equipamentos.problema_no_hostname(valor)
         if problema is None:
             return valor
-        print(f"  ! Hostname invalido: {problema}.")
+        print(f"  ! Hostname inválido: {problema}.")
 
 
 def coluna(texto, largura):
@@ -135,19 +135,19 @@ def mostrar_equipamento(id_equipamento, registro):
     print(f"\n  ID ............ {id_equipamento}")
     print(f"  Hostname ...... {registro['hostname']}")
     print(f"  Custodiante ... {registro['custodiante']}")
-    print(f"  Lotacao ....... {registro['lotacao']}")
+    print(f"  Lotação ....... {registro['lotacao']}")
     print(f"  Categoria ..... {registro['categoria'].rotulo}")
-    print(f"  Descricao ..... {registro['descricao']}")
+    print(f"  Descrição ..... {registro['descricao']}")
 
 
 def mostrar_falha(id_falha, registro):
     """Uma vulnerabilidade sozinha, nas telas de correção e de exclusão."""
     print(f"\n  ID ............ {id_falha}")
     print(f"  Equipamento ... {registro['equipamento_id']}")
-    print(f"  Descricao ..... {registro['descricao']}")
+    print(f"  Descrição ..... {registro['descricao']}")
     print(f"  Categoria ..... {registro['origem'].rotulo}")
     print(f"  Severidade .... {registro['gravidade'].rotulo}")
-    print(f"  Situacao ...... {registro['situacao'].rotulo}")
+    print(f"  Situação ...... {registro['situacao'].rotulo}")
 
 
 def mostrar_falhas(base_falhas, id_equipamento):
@@ -171,22 +171,22 @@ def mostrar_falhas(base_falhas, id_equipamento):
     encontradas = falhas.listar_por_equipamento(base_falhas, id_equipamento)
 
     if not encontradas:
-        print("\n  Este equipamento esta sem vulnerabilidades registradas.")
+        print("\n  Este equipamento está sem vulnerabilidades registradas.")
         return
 
     print(f"\n  Vulnerabilidades ({len(encontradas)}), da mais grave:\n")
 
     # A largura da coluna do ID vem do maior ID DESTA lista. Assim as
-    # descricoes ficam alinhadas entre si e a segunda linha de cada item
+    # descrições ficam alinhadas entre si e a segunda linha de cada item
     # alinha com a primeira, tanto com [3] quanto com [147]. Escrever a
-    # largura na mao daria certo hoje e quebraria no dia em que a base
+    # largura na mão daria certo hoje e quebraria no dia em que a base
     # passasse de 9 vulnerabilidades.
     largura_id = max(len(f"[{id_falha}]") for id_falha, _ in encontradas)
 
     for id_falha, registro in encontradas:
         marcador = f"[{id_falha}]"
-        # As chaves de dentro, em {marcador:<{largura_id}}, sao a largura
-        # calculada acima: da para montar o formato em tempo de execucao.
+        # As chaves de dentro, em {marcador:<{largura_id}}, são a largura
+        # calculada acima: dá para montar o formato em tempo de execução.
         print(f"    {registro['gravidade'].rotulo.upper():<9} "
               f"{marcador:<{largura_id}} {registro['descricao']}")
         print(f"    {'':<9} {'':<{largura_id}} "
@@ -205,15 +205,15 @@ def cadastrar_falha_para(base_equipamentos, base_falhas, id_equipamento):
     própria (requisito 7, "a qualquer momento após o cadastro"). Escrevê-la
     uma vez só evita que as duas telas se comportem de forma diferente.
     """
-    descricao = ler_texto("  Descricao da vulnerabilidade: ")
+    descricao = ler_texto("  Descrição da vulnerabilidade: ")
     origem = ler_enum("  Categoria da vulnerabilidade:", OrigemFalha)
     gravidade = ler_enum("  Severidade:", NivelGravidade)
     situacao = ler_enum("  Status do tratamento:", SituacaoTratamento)
 
     id_falha = falhas.cadastrar(base_falhas, id_equipamento, descricao,
                                 origem, gravidade, situacao)
-    # Grava ANTES de confirmar: a mensagem de sucesso so aparece quando o
-    # dado ja esta no disco.
+    # Grava ANTES de confirmar: a mensagem de sucesso só aparece quando o
+    # dado já está no disco.
     arquivo.salvar(base_equipamentos, base_falhas)
     print(f"\n  Vulnerabilidade {id_falha} registrada.")
 
@@ -222,9 +222,9 @@ def acao_cadastrar_equipamento(base_equipamentos, base_falhas):
     """REQUISITO 3."""
     print("\n--- CADASTRAR EQUIPAMENTO ---\n")
     hostname    = ler_hostname("  Hostname: ")
-    custodiante = ler_texto("  Custodiante (responsavel): ")
-    lotacao     = ler_texto("  Lotacao (setor): ")
-    descricao   = ler_texto("  Descricao: ")
+    custodiante = ler_texto("  Custodiante (responsável): ")
+    lotacao     = ler_texto("  Lotação (setor): ")
+    descricao   = ler_texto("  Descrição: ")
     categoria   = ler_enum("  Tipo de equipamento:", CategoriaEquipamento)
 
     try:
@@ -236,10 +236,10 @@ def acao_cadastrar_equipamento(base_equipamentos, base_falhas):
         print(f"\n  ! {erro}")
         return
 
-    # Grava ANTES de confirmar. Antes, a gravacao so acontecia depois do laco
-    # de vulnerabilidades: se o usuario saisse no meio dele, via "cadastrado"
+    # Grava ANTES de confirmar. Antes, a gravação só acontecia depois do laço
+    # de vulnerabilidades: se o usuário saísse no meio dele, via "cadastrado"
     # na tela e o equipamento se perdia. Agora a regra vale para as seis
-    # acoes que alteram dados - nenhuma confirma o que ainda nao gravou.
+    # ações que alteram dados - nenhuma confirma o que ainda não gravou.
     arquivo.salvar(base_equipamentos, base_falhas)
     print(f"\n  Equipamento cadastrado com o ID {id_novo}.")
 
@@ -259,10 +259,10 @@ def acao_listar_todos(base_equipamentos, base_falhas):
         print("\n  Nenhum equipamento cadastrado ainda.")
         return
 
-    # Larguras num lugar so: cabecalho, linha de tracos e linhas de dados
-    # usam os mesmos numeros, entao nao tem como um sair diferente do outro.
+    # Larguras num lugar só: cabeçalho, linha de traços e linhas de dados
+    # usam os mesmos números, então não tem como um sair diferente do outro.
     cabecalho = (f"  {coluna('ID', 4)} {coluna('HOSTNAME', 20)} "
-                 f"{coluna('CATEGORIA', 22)} {coluna('LOTACAO', 16)} VULNS")
+                 f"{coluna('CATEGORIA', 22)} {coluna('LOTAÇÃO', 16)} VULNS")
     print("\n" + cabecalho)
     print("  " + "-" * (len(cabecalho) - 2))
     for id_equipamento, registro in sorted(base_equipamentos.items()):
@@ -278,7 +278,7 @@ def acao_buscar(base_equipamentos, base_falhas):
     print("\n--- BUSCAR EQUIPAMENTO ---\n")
     print("    1 - Por ID")
     print("    2 - Por hostname")
-    opcao = ler_inteiro("  Opcao: ")
+    opcao = ler_inteiro("  Opção: ")
 
     if opcao == 1:
         id_equipamento = ler_inteiro("  ID: ")
@@ -301,7 +301,7 @@ def acao_buscar(base_equipamentos, base_falhas):
             mostrar_falhas(base_falhas, id_equipamento)
 
     else:
-        print("\n  ! Opcao invalida.")
+        print("\n  ! Opção inválida.")
 
 
 def acao_atualizar(base_equipamentos, base_falhas):
@@ -330,11 +330,11 @@ def acao_atualizar(base_equipamentos, base_falhas):
     if novo:
         alteracoes["custodiante"] = novo
 
-    novo = ler_texto(f"  Lotacao [{registro['lotacao']}]: ", obrigatorio=False)
+    novo = ler_texto(f"  Lotação [{registro['lotacao']}]: ", obrigatorio=False)
     if novo:
         alteracoes["lotacao"] = novo
 
-    novo = ler_texto(f"  Descricao [{registro['descricao']}]: ", obrigatorio=False)
+    novo = ler_texto(f"  Descrição [{registro['descricao']}]: ", obrigatorio=False)
     if novo:
         alteracoes["descricao"] = novo
 
@@ -370,8 +370,8 @@ def acao_excluir(base_equipamentos, base_falhas):
     mostrar_equipamento(id_equipamento, registro)
     mostrar_falhas(base_falhas, id_equipamento)
 
-    if not confirmar("\n  Confirma a exclusao do equipamento e das falhas dele?"):
-        print("\n  Exclusao cancelada.")
+    if not confirmar("\n  Confirma a exclusão do equipamento e das falhas dele?"):
+        print("\n  Exclusão cancelada.")
         return
 
     # A CASCATA. Nesta ordem de propósito: primeiro as falhas, depois o
@@ -382,7 +382,7 @@ def acao_excluir(base_equipamentos, base_falhas):
     equipamentos.excluir(base_equipamentos, id_equipamento)
 
     arquivo.salvar(base_equipamentos, base_falhas)
-    print(f"\n  Equipamento excluido, junto com {removidas} vulnerabilidade(s).")
+    print(f"\n  Equipamento excluído, junto com {removidas} vulnerabilidade(s).")
 
 
 def acao_cadastrar_falha(base_equipamentos, base_falhas):
@@ -436,25 +436,25 @@ def acao_atualizar_falha(base_equipamentos, base_falhas):
 
     alteracoes = {}
 
-    novo = ler_texto(f"  Descricao [{registro['descricao']}]: ",
+    novo = ler_texto(f"  Descrição [{registro['descricao']}]: ",
                      obrigatorio=False)
     if novo:
         alteracoes["descricao"] = novo
 
     nova_origem = ler_enum(
-        f"  Categoria (atual: {registro['origem'].rotulo}) - Enter mantem:",
+        f"  Categoria (atual: {registro['origem'].rotulo}) - Enter para manter:",
         OrigemFalha, opcional=True)
     if nova_origem is not None:
         alteracoes["origem"] = nova_origem
 
     nova_gravidade = ler_enum(
-        f"  Severidade (atual: {registro['gravidade'].rotulo}) - Enter mantem:",
+        f"  Severidade (atual: {registro['gravidade'].rotulo}) - Enter para manter:",
         NivelGravidade, opcional=True)
     if nova_gravidade is not None:
         alteracoes["gravidade"] = nova_gravidade
 
     nova_situacao = ler_enum(
-        f"  Situacao (atual: {registro['situacao'].rotulo}) - Enter mantem:",
+        f"  Situação (atual: {registro['situacao'].rotulo}) - Enter para manter:",
         SituacaoTratamento, opcional=True)
     if nova_situacao is not None:
         alteracoes["situacao"] = nova_situacao
@@ -491,17 +491,17 @@ def acao_excluir_falha(base_equipamentos, base_falhas):
 
     mostrar_falha(id_falha, base_falhas[id_falha])
 
-    print("\n  Atencao: exclua apenas cadastro errado ou duplicado.")
-    print("  Se a vulnerabilidade foi resolvida, use a opcao 8 e marque")
-    print("  como Corrigida - apagar destroi o historico.")
+    print("\n  Atenção: exclua apenas cadastro errado ou duplicado.")
+    print("  Se a vulnerabilidade foi resolvida, use a opção 8 e marque")
+    print("  como Corrigida - apagar destrói o histórico.")
 
-    if not confirmar("\n  Confirma a exclusao?"):
-        print("\n  Exclusao cancelada.")
+    if not confirmar("\n  Confirma a exclusão?"):
+        print("\n  Exclusão cancelada.")
         return
 
     falhas.excluir(base_falhas, id_falha)
     arquivo.salvar(base_equipamentos, base_falhas)
-    print("\n  Vulnerabilidade excluida.")
+    print("\n  Vulnerabilidade excluída.")
 
 
 # ===========================================================================
@@ -544,7 +544,7 @@ def exibir_menu():
 
 def main():
     print("\n" + "=" * 62)
-    print("  INVENTARIO DE SEGURANCA DE TI")
+    print("  INVENTÁRIO DE ATIVOS E VULNERABILIDADES")
     print("=" * 62)
 
     # Carrego a base UMA vez, no início. Durante a execução tudo acontece na
@@ -556,15 +556,15 @@ def main():
 
     while True:
         exibir_menu()
-        opcao = ler_inteiro("  Opcao: ")
+        opcao = ler_inteiro("  Opção: ")
 
         if opcao == 0:
-            print("\n  Ate logo.\n")
+            print("\n  Até logo.\n")
             break
 
         acao = ACOES.get(opcao)
         if acao is None:
-            print("\n  ! Opcao inexistente. Escolha um numero do menu.")
+            print("\n  ! Opção inexistente. Escolha um número do menu.")
             continue
 
         try:
@@ -595,4 +595,4 @@ if __name__ == "__main__":
     except (KeyboardInterrupt, EOFError):
         # Ctrl+C ou fim de entrada: encerra limpo em vez de despejar um
         # traceback vermelho de dez linhas.
-        print("\n\n  Encerrado pelo usuario.\n")
+        print("\n\n  Encerrado pelo usuário.\n")

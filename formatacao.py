@@ -19,7 +19,7 @@ chega misturado e passa intacto, enquanto "setor de ti" vira "Setor de Ti".
 """
 
 # Partículas que ficam em minúscula quando não são a primeira palavra.
-# Sem elas, "Sala de Maquinas" viraria "Sala De Maquinas" - errado em
+# Sem elas, "Sala de Máquinas" viraria "Sala De Máquinas" - errado em
 # português, e o .title() do Python comete exatamente esse erro.
 PARTICULAS = ("de", "da", "do", "das", "dos", "e")
 
@@ -40,8 +40,8 @@ def titulo(texto):
     Para nome de pessoa e nome de lugar: inicial maiúscula em cada palavra,
     partículas em minúscula.
 
-        "escrivao de plantao"  -> "Escrivao de Plantao"
-        "ESCRIVAO DE PLANTAO"  -> "Escrivao de Plantao"
+        "escrivão de plantão"  -> "Escrivão de Plantão"
+        "ESCRIVÃO DE PLANTÃO"  -> "Escrivão de Plantão"
         "Setor de TI"          -> "Setor de TI"   (misturado: respeita)
 
     O split() de quebra também limpa espaços repetidos, de graça.
@@ -85,17 +85,17 @@ def frase(texto):
 
 if __name__ == "__main__":
     casos_titulo = [
-        ("escrivao de plantao", "Escrivao de Plantao"),
-        ("ESCRIVAO DE PLANTAO", "Escrivao de Plantao"),
+        ("escrivão de plantão", "Escrivão de Plantão"),
+        ("ESCRIVÃO DE PLANTÃO", "Escrivão de Plantão"),
         ("Setor de TI",         "Setor de TI"),
-        ("sala   de  maquinas", "Sala de Maquinas"),
-        ("cartorio",            "Cartorio"),
+        ("sala   de  máquinas", "Sala de Máquinas"),
+        ("cartório",            "Cartório"),
     ]
     casos_frase = [
         ("porta RDP exposta",      "Porta RDP exposta"),
         ("PORTA RDP EXPOSTA",      "Porta rdp exposta"),
-        ("senha padrao de fabrica", "Senha padrao de fabrica"),
-        ("Ja estava certo",        "Ja estava certo"),
+        ("senha padrão de fábrica", "Senha padrão de fábrica"),
+        ("Já estava certo",        "Já estava certo"),
     ]
 
     print("--- titulo() ---")
@@ -112,4 +112,4 @@ if __name__ == "__main__":
         print(f"  {marca} {entrada!r:28} -> {obtido!r}")
         assert obtido == esperado, f"esperava {esperado!r}"
 
-    print("\nOK - formatacao passou em todos os casos.")
+    print("\nOK - formatação passou em todos os casos.")

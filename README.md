@@ -1,4 +1,4 @@
-# Inventário de Segurança de TI
+# Inventário de Ativos e Vulnerabilidades
 
 Programa de linha de comando em Python para cadastro, consulta, atualização e
 remoção (CRUD) de ativos de TI e das vulnerabilidades associadas a eles.
@@ -9,7 +9,8 @@ FEELT/UFU, 2026/2.
 ## Como executar
 
 Requer Python 3.8 ou superior. Não há dependências externas: o programa usa
-apenas a biblioteca padrão (`json`, `os`, `enum`).
+apenas a biblioteca padrão (`json`, `os`, `enum`, `string` e, nos testes
+embutidos, `tempfile`).
 
 ```
 git clone https://github.com/heluiz/Projeto_Ciberseguran-a.git

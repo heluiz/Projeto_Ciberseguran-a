@@ -67,18 +67,18 @@ def problema_no_hostname(hostname):
     """
     h = hostname.strip()
     if not h:
-        return "nao pode ficar vazio"
+        return "não pode ficar vazio"
     if len(h) > 63:
-        return f"tem {len(h)} caracteres, o maximo e 63"
+        return f"tem {len(h)} caracteres, o máximo é 63"
     invalidos = sorted(set(h) - _CARACTERES_HOSTNAME)
     if invalidos:
         mostrados = " ".join(repr(c) for c in invalidos)
-        return (f"caractere(s) nao permitido(s): {mostrados} - use apenas "
-                f"letras sem acento, numeros e hifen")
+        return (f"caractere(s) não permitido(s): {mostrados} - use apenas "
+                f"letras sem acento, números e hífen")
     if h[0] == "-" or h[-1] == "-":
-        return "nao pode comecar nem terminar com hifen"
+        return "não pode começar nem terminar com hífen"
     if h.isdigit():
-        return "nao pode ser composto so de numeros"
+        return "não pode ser composto só de números"
     return None
 
 
@@ -135,9 +135,9 @@ def cadastrar(equipamentos, hostname, custodiante, lotacao, descricao, categoria
     """
     problema = problema_no_hostname(hostname)
     if problema:
-        raise ValueError(f"Hostname invalido: {problema}")
+        raise ValueError(f"Hostname inválido: {problema}")
     if _hostname_existe(equipamentos, hostname):
-        raise ValueError(f"Ja existe equipamento com o hostname '{hostname}'")
+        raise ValueError(f"Já existe equipamento com o hostname '{hostname}'")
 
     id_novo = proximo_id_equipamento(equipamentos)
     equipamentos[id_novo] = {
@@ -204,14 +204,14 @@ def atualizar(equipamentos, id_equipamento, alteracoes):
 
     for campo, valor in alteracoes.items():
         if campo not in CAMPOS_EDITAVEIS:
-            raise ValueError(f"Campo nao editavel: '{campo}'")
+            raise ValueError(f"Campo não editável: '{campo}'")
         if campo == "hostname":
             problema = problema_no_hostname(valor)
             if problema:
-                raise ValueError(f"Hostname invalido: {problema}")
+                raise ValueError(f"Hostname inválido: {problema}")
             if _hostname_existe(equipamentos, valor, ignorar_id=id_equipamento):
-                raise ValueError(f"Ja existe equipamento com o hostname '{valor}'")
-        # Mesma normalizacao do cadastro, pela mesma funcao.
+                raise ValueError(f"Já existe equipamento com o hostname '{valor}'")
+        # Mesma normalização do cadastro, pela mesma função.
         registro[campo] = _normalizar(campo, valor)
 
     return True
@@ -248,11 +248,11 @@ if __name__ == "__main__":
     equipamentos = {}
 
     # --- Requisito 3 ---
-    id1 = cadastrar(equipamentos, "PC-CARTORIO-01", "Escrivao de plantao",
-                    "Cartorio", "Estacao de atendimento ao publico",
+    id1 = cadastrar(equipamentos, "PC-CARTORIO-01", "Escrivão de plantão",
+                    "Cartório", "Estação de atendimento ao público",
                     CategoriaEquipamento.ESTACAO_TRABALHO)
     id2 = cadastrar(equipamentos, "SRV-ARQUIVO", "Chefe de equipe",
-                    "Sala tecnica", "Servidor de arquivos",
+                    "Sala técnica", "Servidor de arquivos",
                     CategoriaEquipamento.SERVIDOR)
     print(f"Cadastrados os ids: {id1} e {id2}")
 
@@ -268,23 +268,23 @@ if __name__ == "__main__":
         try:
             cadastrar(equipamentos, ruim, "X", "Y", "Z",
                       CategoriaEquipamento.SERVIDOR)
-            raise AssertionError(f"aceitou hostname invalido: {ruim!r}")
+            raise AssertionError(f"aceitou hostname inválido: {ruim!r}")
         except ValueError as erro:
             print(f"Recusado {ruim!r:15} {erro}")
-    assert problema_no_hostname("10-ANDAR") is None, "recusou hostname valido"
-    print("Aceito   '10-ANDAR'      comeca com numero, mas nao e so numero")
+    assert problema_no_hostname("10-ANDAR") is None, "recusou hostname válido"
+    print("Aceito   '10-ANDAR'      começa com número, mas não é só número")
 
     # --- Requisito 4 ---
     print(f"\nBusca por id 2: {buscar_por_id(equipamentos, 2)['hostname']}")
-    print(f"Busca por id 99: {buscar_por_id(equipamentos, 99)}  (None = nao existe)")
+    print(f"Busca por id 99: {buscar_por_id(equipamentos, 99)}  (None = não existe)")
 
     print("\nBusca parcial por 'cart':")
     for id_equipamento, registro in buscar_por_hostname(equipamentos, "cart"):
         print(f"  {id_equipamento} - {registro['hostname']}")
 
     # --- Requisito 5 ---
-    atualizar(equipamentos, 1, {"custodiante": "Investigador de plantao"})
-    print(f"\nApos atualizar: {equipamentos[1]['custodiante']}")
+    atualizar(equipamentos, 1, {"custodiante": "Investigador de plantão"})
+    print(f"\nApós atualizar: {equipamentos[1]['custodiante']}")
 
     try:
         atualizar(equipamentos, 1, {"id": 50})
@@ -293,7 +293,7 @@ if __name__ == "__main__":
 
     # --- Requisito 6 ---
     print(f"\nExcluindo id 2: {excluir(equipamentos, 2)}")
-    print(f"Excluindo id 2 de novo: {excluir(equipamentos, 2)}  (False = ja nao existia)")
+    print(f"Excluindo id 2 de novo: {excluir(equipamentos, 2)}  (False = já não existia)")
     print(f"Restaram os ids: {list(equipamentos.keys())}")
 
     print("\nOK - requisitos 3, 4, 5 e 6 exercitados.")

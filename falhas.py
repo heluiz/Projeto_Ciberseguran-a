@@ -62,7 +62,7 @@ def listar_por_equipamento(falhas, equipamento_id):
     si sai no main.py - este módulo não fala com o usuário.
 
     A ordenação usa .gravidade.value, e é aqui que a decisão lá do
-    classificacoes.py se paga: numerei BAIXA=1 ate CRITICA=4 justamente para
+    classificacoes.py se paga: numerei BAIXA=1 até CRITICA=4 justamente para
     que a ordem dos números significasse ordem de gravidade. Se eu tivesse
     numerado em ordem alfabética, esta ordenação não faria sentido nenhum.
     """
@@ -100,10 +100,10 @@ def atualizar(falhas, id_falha, alteracoes):
 
     for campo, valor in alteracoes.items():
         if campo not in CAMPOS_EDITAVEIS:
-            raise ValueError(f"Campo nao editavel: '{campo}'")
+            raise ValueError(f"Campo não editável: '{campo}'")
         if campo == "descricao":
-            # Mesma regra de frase do cadastro: so a primeira letra em
-            # maiuscula, preservando acronimos como RDP ou CPD.
+            # Mesma regra de frase do cadastro: só a primeira letra em
+            # maiúscula, preservando acrônimos como RDP ou CPD.
             valor = formatacao.frase(valor)
         registro[campo] = valor
 
@@ -164,13 +164,13 @@ if __name__ == "__main__":
     falhas = {}
 
     # --- Requisito 7 ---
-    cadastrar(falhas, 1, "Sistema operacional sem atualizacao ha 8 meses",
+    cadastrar(falhas, 1, "Sistema operacional sem atualização há 8 meses",
               OrigemFalha.FALTA_ATUALIZACAO, NivelGravidade.ALTA,
               SituacaoTratamento.ABERTA)
     cadastrar(falhas, 1, "Compartilhamento de rede aberto para todos",
               OrigemFalha.PERMISSAO_INDEVIDA, NivelGravidade.CRITICA,
               SituacaoTratamento.EM_TRATAMENTO)
-    cadastrar(falhas, 1, "Senha padrao de fabrica ainda em uso",
+    cadastrar(falhas, 1, "Senha padrão de fábrica ainda em uso",
               OrigemFalha.SENHA_FRACA, NivelGravidade.MEDIA,
               SituacaoTratamento.ABERTA)
     cadastrar(falhas, 2, "Porta de acesso remoto exposta na rede interna",
@@ -188,9 +188,9 @@ if __name__ == "__main__":
     print(f"\nFalhas do equipamento 99: {vazio}")
     print("  (lista vazia = o menu vai dizer 'sem vulnerabilidades registradas')")
 
-    # --- correcao de um cadastro errado ---
+    # --- correção de um cadastro errado ---
     atualizar(falhas, 3, {"gravidade": NivelGravidade.CRITICA,
-                          "descricao": "Senha padrao de fabrica na interface web"})
+                          "descricao": "Senha padrão de fábrica na interface web"})
     print(f"\nFalha 3 corrigida: {falhas[3]['gravidade'].rotulo} | "
           f"{falhas[3]['descricao']}")
 
@@ -201,17 +201,17 @@ if __name__ == "__main__":
 
     # --- acompanhamento do tratamento ---
     atualizar(falhas, 1, {"situacao": SituacaoTratamento.CORRIGIDA})
-    print(f"Falha 1 agora esta: {falhas[1]['situacao'].rotulo}")
+    print(f"Falha 1 agora está: {falhas[1]['situacao'].rotulo}")
 
-    # --- exclusao de uma vulnerabilidade so ---
+    # --- exclusão de uma vulnerabilidade só ---
     print(f"\nExcluindo a falha 3: {excluir(falhas, 3)}")
     print(f"Excluindo a falha 3 de novo: {excluir(falhas, 3)}  "
-          f"(False = ja nao existia)")
+          f"(False = já não existia)")
     print(f"Restaram os ids: {sorted(falhas.keys())}")
 
     # --- Requisito 6, cascata ---
     removidas = excluir_por_equipamento(falhas, 1)
-    print(f"\nExcluidas em cascata do equipamento 1: {removidas}")
+    print(f"\nExcluídas em cascata do equipamento 1: {removidas}")
     print(f"Restaram os ids: {list(falhas.keys())}  (a falha do equipamento 2)")
 
     print("\nOK - requisitos 7, 8 e a cascata do 6 exercitados.")
