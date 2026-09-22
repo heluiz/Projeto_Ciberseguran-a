@@ -134,6 +134,18 @@ def mostrar_falhas(base_falhas, id_equipamento):
     REQUISITO 8.
     A mensagem de "sem vulnerabilidades registradas" que o enunciado exige
     sai exatamente aqui - este é o único módulo que fala com o usuário.
+
+    Sobre o formato: o programa imprime texto puro, sem cor nem negrito
+    disponíveis. Então a hierarquia precisa vir de ordem, posição e espaço
+    em branco. Foi assim que decidi:
+
+    - A severidade fica numa coluna fixa à esquerda, porque num inventário
+      de segurança a pergunta é "o que é crítico aqui?". De quebra, deixa
+      visível na tela a ordenação por gravidade que o falhas.py já faz.
+    - A descrição vem logo em seguida, porque é ela que diz qual é o
+      problema. Antes ela ficava na segunda linha, abaixo dos metadados.
+    - Situação e categoria descem para a segunda linha, como legenda.
+    - A linha em branco entre os itens impede que a lista vire um bloco só.
     """
     encontradas = falhas.listar_por_equipamento(base_falhas, id_equipamento)
 
@@ -141,11 +153,23 @@ def mostrar_falhas(base_falhas, id_equipamento):
         print("\n  Este equipamento esta sem vulnerabilidades registradas.")
         return
 
-    print(f"\n  Vulnerabilidades ({len(encontradas)}), da mais grave:")
+    print(f"\n  Vulnerabilidades ({len(encontradas)}), da mais grave:\n")
+
+    # A largura da coluna do ID vem do maior ID DESTA lista. Assim as
+    # descricoes ficam alinhadas entre si e a segunda linha de cada item
+    # alinha com a primeira, tanto com [3] quanto com [147]. Escrever a
+    # largura na mao daria certo hoje e quebraria no dia em que a base
+    # passasse de 9 vulnerabilidades.
+    largura_id = max(len(f"[{id_falha}]") for id_falha, _ in encontradas)
+
     for id_falha, registro in encontradas:
-        print(f"    [{id_falha}] {registro['gravidade'].rotulo:8} | "
-              f"{registro['situacao'].rotulo:18} | {registro['origem'].rotulo}")
-        print(f"         {registro['descricao']}")
+        marcador = f"[{id_falha}]"
+        # As chaves de dentro, em {marcador:<{largura_id}}, sao a largura
+        # calculada acima: da para montar o formato em tempo de execucao.
+        print(f"    {registro['gravidade'].rotulo.upper():<9} "
+              f"{marcador:<{largura_id}} {registro['descricao']}")
+        print(f"    {'':<9} {'':<{largura_id}} "
+              f"{registro['situacao'].rotulo} \u00b7 {registro['origem'].rotulo}\n")
 
 
 # ===========================================================================
