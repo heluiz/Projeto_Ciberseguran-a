@@ -105,6 +105,16 @@ def mostrar_equipamento(id_equipamento, registro):
     print(f"  Descricao ..... {registro['descricao']}")
 
 
+def mostrar_falha(id_falha, registro):
+    """Uma vulnerabilidade sozinha, nas telas de correção e de exclusão."""
+    print(f"\n  ID ............ {id_falha}")
+    print(f"  Equipamento ... {registro['equipamento_id']}")
+    print(f"  Descricao ..... {registro['descricao']}")
+    print(f"  Categoria ..... {registro['origem'].rotulo}")
+    print(f"  Severidade .... {registro['gravidade'].rotulo}")
+    print(f"  Situacao ...... {registro['situacao'].rotulo}")
+
+
 def mostrar_falhas(base_falhas, id_equipamento):
     """
     REQUISITO 8.
@@ -332,9 +342,18 @@ def acao_ver_falhas(base_equipamentos, base_falhas):
     mostrar_falhas(base_falhas, id_equipamento)
 
 
-def acao_atualizar_situacao(base_equipamentos, base_falhas):
-    """Acompanhamento do tratamento: aberta -> em tratamento -> corrigida."""
-    print("\n--- ATUALIZAR SITUACAO DE UMA VULNERABILIDADE ---\n")
+def acao_atualizar_falha(base_equipamentos, base_falhas):
+    """
+    Correção de uma vulnerabilidade já cadastrada: descrição, categoria,
+    severidade ou situação.
+
+    Mesma mecânica da opção 4 de propósito - Enter mantém o valor atual.
+    Quem aprendeu a atualizar um equipamento já sabe usar esta tela.
+
+    Trocar a situação é um caso particular: Enter nos três primeiros campos
+    e escolha só no último.
+    """
+    print("\n--- ATUALIZAR VULNERABILIDADE ---\n")
     id_falha = ler_inteiro("  ID da vulnerabilidade: ")
 
     if id_falha not in base_falhas:
@@ -342,14 +361,77 @@ def acao_atualizar_situacao(base_equipamentos, base_falhas):
         return
 
     registro = base_falhas[id_falha]
-    print(f"\n  {registro['descricao']}")
-    print(f"  Situacao atual: {registro['situacao'].rotulo}")
+    mostrar_falha(id_falha, registro)
+    print("\n  Deixe em branco para manter o valor atual.\n")
 
-    nova = ler_enum("  Nova situacao:", SituacaoTratamento)
-    falhas.atualizar_situacao(base_falhas, id_falha, nova)
+    alteracoes = {}
+
+    novo = ler_texto(f"  Descricao [{registro['descricao']}]: ",
+                     obrigatorio=False)
+    if novo:
+        alteracoes["descricao"] = novo
+
+    nova_origem = ler_enum(
+        f"  Categoria (atual: {registro['origem'].rotulo}) - Enter mantem:",
+        OrigemFalha, opcional=True)
+    if nova_origem is not None:
+        alteracoes["origem"] = nova_origem
+
+    nova_gravidade = ler_enum(
+        f"  Severidade (atual: {registro['gravidade'].rotulo}) - Enter mantem:",
+        NivelGravidade, opcional=True)
+    if nova_gravidade is not None:
+        alteracoes["gravidade"] = nova_gravidade
+
+    nova_situacao = ler_enum(
+        f"  Situacao (atual: {registro['situacao'].rotulo}) - Enter mantem:",
+        SituacaoTratamento, opcional=True)
+    if nova_situacao is not None:
+        alteracoes["situacao"] = nova_situacao
+
+    if not alteracoes:
+        print("\n  Nada foi alterado.")
+        return
+
+    try:
+        falhas.atualizar(base_falhas, id_falha, alteracoes)
+    except ValueError as erro:
+        print(f"\n  ! {erro}")
+        return
 
     arquivo.salvar(base_equipamentos, base_falhas)
-    print(f"\n  Situacao alterada para: {nova.rotulo}")
+    print(f"\n  Vulnerabilidade atualizada ({len(alteracoes)} campo(s)).")
+
+
+def acao_excluir_falha(base_equipamentos, base_falhas):
+    """
+    Exclui UMA vulnerabilidade - para cadastro errado ou duplicado.
+
+    A confirmação diz explicitamente que resolver e apagar são coisas
+    diferentes. Um inventário que apaga o que foi corrigido perde o
+    histórico, e é justamente o histórico que mostra se a organização
+    trata ou acumula problema.
+    """
+    print("\n--- EXCLUIR VULNERABILIDADE ---\n")
+    id_falha = ler_inteiro("  ID da vulnerabilidade: ")
+
+    if id_falha not in base_falhas:
+        print(f"\n  ! Nenhuma vulnerabilidade com o ID {id_falha}.")
+        return
+
+    mostrar_falha(id_falha, base_falhas[id_falha])
+
+    print("\n  Atencao: exclua apenas cadastro errado ou duplicado.")
+    print("  Se a vulnerabilidade foi resolvida, use a opcao 8 e marque")
+    print("  como Corrigida - apagar destroi o historico.")
+
+    if not confirmar("\n  Confirma a exclusao?"):
+        print("\n  Exclusao cancelada.")
+        return
+
+    falhas.excluir(base_falhas, id_falha)
+    arquivo.salvar(base_equipamentos, base_falhas)
+    print("\n  Vulnerabilidade excluida.")
 
 
 # ===========================================================================
@@ -370,7 +452,8 @@ ACOES = {
     5: acao_excluir,
     6: acao_cadastrar_falha,
     7: acao_ver_falhas,
-    8: acao_atualizar_situacao,
+    8: acao_atualizar_falha,
+    9: acao_excluir_falha,
 }
 
 
@@ -383,7 +466,8 @@ def exibir_menu():
     print("  5 - Excluir equipamento (e suas vulnerabilidades)")
     print("  6 - Cadastrar vulnerabilidade")
     print("  7 - Ver vulnerabilidades de um equipamento")
-    print("  8 - Atualizar situacao de uma vulnerabilidade")
+    print("  8 - Atualizar vulnerabilidade")
+    print("  9 - Excluir vulnerabilidade")
     print("  0 - Sair")
     print("=" * 62)
 

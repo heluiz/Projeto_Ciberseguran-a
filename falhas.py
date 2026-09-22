@@ -12,6 +12,13 @@ Atende aos requisitos 7 e 8, e à parte de cascata do requisito 6.
 from arquivo import proximo_id
 
 
+# Campos que podem ser corrigidos depois do cadastro.
+# O equipamento_id NÃO está aqui de propósito: mover uma vulnerabilidade de um
+# equipamento para outro não é correção, é outro cadastro. Se foi lançada no
+# equipamento errado, o certo é excluir e cadastrar no lugar certo.
+CAMPOS_EDITAVEIS = ("descricao", "origem", "gravidade", "situacao")
+
+
 # ===========================================================================
 # REQUISITO 7 - cadastro de vulnerabilidade
 # ===========================================================================
@@ -71,20 +78,50 @@ def listar_por_equipamento(falhas, equipamento_id):
     return encontradas
 
 
-def atualizar_situacao(falhas, id_falha, nova_situacao):
+def atualizar(falhas, id_falha, alteracoes):
     """
-    Muda só o status de tratamento: aberta -> em tratamento -> corrigida.
-    Devolve True se mudou, False se o id não existe.
+    'alteracoes' é um dicionário {campo: novo_valor}. Só os campos presentes
+    mudam; o resto fica como estava. Devolve True se atualizou, False se o id
+    não existe, e levanta ValueError num campo protegido.
 
-    O enunciado não pede esta função. Incluí porque sem ela o "status de
-    tratamento" do requisito 7 seria decorativo: eu registraria que a falha
-    está aberta e nunca poderia marcá-la como corrigida. Um inventário de
-    segurança existe justamente para acompanhar esse ciclo.
+    Mesma forma da atualização de equipamentos, de propósito: duas telas que
+    fazem a mesma coisa devem funcionar do mesmo jeito.
+
+    Por que isto existe: sem ele, um erro de digitação no cadastro só teria
+    conserto excluindo o equipamento inteiro - e levando junto as outras
+    vulnerabilidades dele. Pior ainda com a severidade: uma falha lançada
+    como Média quando era Crítica distorce a priorização, que é a razão de
+    ser do inventário.
     """
     registro = falhas.get(id_falha)
     if registro is None:
         return False
-    registro["situacao"] = nova_situacao
+
+    for campo, valor in alteracoes.items():
+        if campo not in CAMPOS_EDITAVEIS:
+            raise ValueError(f"Campo nao editavel: '{campo}'")
+        if campo == "descricao":
+            valor = valor.strip()
+        registro[campo] = valor
+
+    return True
+
+
+def excluir(falhas, id_falha):
+    """
+    Apaga UMA vulnerabilidade. Devolve True se apagou, False se não existia.
+
+    Quando apagar é legítimo? Só quando o registro nunca deveria ter existido:
+    cadastro errado ou duplicado. Vulnerabilidade resolvida não se apaga -
+    marca-se como Corrigida. Apagar destruiria o histórico, e saber que
+    aquela máquina já teve senha padrão é informação útil.
+
+    Quem deixa essa distinção explícita para o usuário é o main.py, no texto
+    da confirmação.
+    """
+    if id_falha not in falhas:
+        return False
+    del falhas[id_falha]
     return True
 
 
@@ -148,9 +185,26 @@ if __name__ == "__main__":
     print(f"\nFalhas do equipamento 99: {vazio}")
     print("  (lista vazia = o menu vai dizer 'sem vulnerabilidades registradas')")
 
+    # --- correcao de um cadastro errado ---
+    atualizar(falhas, 3, {"gravidade": NivelGravidade.CRITICA,
+                          "descricao": "Senha padrao de fabrica na interface web"})
+    print(f"\nFalha 3 corrigida: {falhas[3]['gravidade'].rotulo} | "
+          f"{falhas[3]['descricao']}")
+
+    try:
+        atualizar(falhas, 3, {"equipamento_id": 99})
+    except ValueError as erro:
+        print(f"Campo protegido: {erro}")
+
     # --- acompanhamento do tratamento ---
-    atualizar_situacao(falhas, 1, SituacaoTratamento.CORRIGIDA)
-    print(f"\nFalha 1 agora esta: {falhas[1]['situacao'].rotulo}")
+    atualizar(falhas, 1, {"situacao": SituacaoTratamento.CORRIGIDA})
+    print(f"Falha 1 agora esta: {falhas[1]['situacao'].rotulo}")
+
+    # --- exclusao de uma vulnerabilidade so ---
+    print(f"\nExcluindo a falha 3: {excluir(falhas, 3)}")
+    print(f"Excluindo a falha 3 de novo: {excluir(falhas, 3)}  "
+          f"(False = ja nao existia)")
+    print(f"Restaram os ids: {sorted(falhas.keys())}")
 
     # --- Requisito 6, cascata ---
     removidas = excluir_por_equipamento(falhas, 1)
