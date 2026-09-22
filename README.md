@@ -19,7 +19,7 @@ python main.py
 
 ## Estrutura
 
-O projeto é dividido em cinco módulos, cada um com uma responsabilidade única.
+O projeto é dividido em seis módulos, cada um com uma responsabilidade única.
 Apenas o `main.py` interage com o usuário — os demais não possuem `input()` nem
 `print()`, o que permite testá-los isoladamente executando cada arquivo
 diretamente (`python equipamentos.py`, por exemplo).
@@ -27,6 +27,7 @@ diretamente (`python equipamentos.py`, por exemplo).
 | Arquivo | Responsabilidade |
 | --- | --- |
 | `classificacoes.py` | Enums: tipo de equipamento, origem, gravidade e situação da falha |
+| `formatacao.py` | Padronização de maiúsculas e minúsculas do texto digitado |
 | `arquivo.py` | Leitura e gravação da base em JSON, com escrita atômica |
 | `equipamentos.py` | CRUD dos equipamentos de TI |
 | `falhas.py` | Cadastro, listagem e exclusão em cascata das vulnerabilidades |
