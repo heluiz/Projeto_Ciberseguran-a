@@ -252,6 +252,16 @@ def proximo_id_falha(falhas):
 # Teste rápido: grava, lê de volta e confere que nada se perdeu no caminho.
 # ===========================================================================
 if __name__ == "__main__":
+    # O teste NUNCA pode tocar na base real. Sem as duas linhas abaixo, rodar
+    # "python arquivo.py" para estudar sobrescrevia o inventario.json com
+    # dados de exemplo - e apagava os equipamentos de verdade.
+    #
+    # Aponto o modulo para um arquivo na pasta temporaria do sistema. Funciona
+    # porque salvar() e carregar() leem ARQUIVO_DADOS na hora em que sao
+    # chamadas, nao na hora em que foram escritas.
+    import tempfile
+    ARQUIVO_DADOS = os.path.join(tempfile.gettempdir(), "inventario_teste.json")
+
     equipamentos = {
         1: {"hostname":    "PC-CARTORIO-01",
             "custodiante": "Escrivao de plantao",
@@ -301,3 +311,6 @@ if __name__ == "__main__":
     print(f"O proximo id foi {id_b} - o {id_a} nao voltou a circular.")
     assert id_b > id_a, "o identificador foi reaproveitado"
     print("\nOK - identificadores nao se repetem.")
+
+    os.remove(ARQUIVO_DADOS)   # limpa o arquivo de teste
+    print("\nA base real (inventario.json) nao foi tocada.")
