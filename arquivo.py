@@ -48,17 +48,17 @@ ARQUIVO_DADOS = os.path.join(PASTA_DO_PROJETO, "inventario.json")
 
 
 # ===========================================================================
-# MARCA D'AGUA DOS IDENTIFICADORES
+# MARCA D'ÁGUA DOS IDENTIFICADORES
 #
-# Guarda o MAIOR id ja entregue para cada colecao - nao o maior que existe
-# agora, e sim o maior que ja existiu. E o que impede um id de ser
-# reaproveitado depois que o registro dele foi excluido.
+# Guarda o MAIOR id já entregue para cada coleção - não o maior que existe
+# agora, e sim o maior que já existiu. É o que impede um id de ser
+# reaproveitado depois que o registro dele foi excluído.
 #
-# Por que aqui, e nao dentro do dicionario de dados? Porque isto e estado
+# Por que aqui, e não dentro do dicionário de dados? Porque isto é estado
 # PERSISTIDO: precisa ser gravado junto com os registros e restaurado na
-# proxima execucao. Este modulo e justamente o dono do que vai para o disco.
+# próxima execução. Este módulo é justamente o dono do que vai para o disco.
 #
-# Comeca zerado. carregar() restaura do arquivo e salvar() grava de volta.
+# Começa zerado. carregar() restaura do arquivo e salvar() grava de volta.
 # ===========================================================================
 _marca_alta = {"equipamentos": 0, "falhas": 0}
 
@@ -74,8 +74,8 @@ _marca_alta = {"equipamentos": 0, "falhas": 0}
 # Enum não vai direto para JSON, então gravo o .value (o código inteiro).
 # ===========================================================================
 def salvar(equipamentos, falhas):
-    # Os contadores vao junto com os registros. Uso max(...) por seguranca:
-    # se por algum motivo a marca estiver atrasada em relacao aos ids que
+    # Os contadores vão junto com os registros. Uso max(...) por segurança:
+    # se por algum motivo a marca estiver atrasada em relação aos ids que
     # existem, grava o maior dos dois e a base continua coerente.
     dados = {
         "equipamentos": {},
@@ -123,14 +123,14 @@ def salvar(equipamentos, falhas):
 
 def _exige_texto(registro, campos):
     """
-    Confere que os campos citados sao mesmo texto.
+    Confere que os campos citados são mesmo texto.
 
     Sem isto, um "hostname": null no arquivo entraria na base sem reclamar e
-    so quebraria muito depois - na primeira busca, com uma mensagem que nao
-    ajuda ninguem a entender a causa. Erro de dado tem que aparecer na carga,
+    só quebraria muito depois - na primeira busca, com uma mensagem que não
+    ajuda ninguém a entender a causa. Erro de dado tem que aparecer na carga,
     perto de onde nasceu.
 
-    Levanta TypeError, que a carga ja converte em BaseInvalida.
+    Levanta TypeError, que a carga já converte em BaseInvalida.
     """
     for campo in campos:
         if not isinstance(registro[campo], str):
@@ -193,18 +193,18 @@ def carregar():
             }
             _exige_texto(item, ("descricao",))
             if not isinstance(item["equipamento_id"], int):
-                raise TypeError("equipamento_id deveria ser um numero inteiro")
+                raise TypeError("equipamento_id deveria ser um número inteiro")
             falhas[int(chave)] = item
-        # Restaura a marca d'agua. Isto fica DENTRO do try de proposito: um
+        # Restaura a marca d'água. Isto fica DENTRO do try de propósito: um
         # contador adulterado ("abc", null, uma lista) faz o max() levantar
-        # TypeError, e ai a base inteira e recusada como qualquer outro
-        # conteudo fora do formato. Fora do try, esse erro escaparia e
-        # derrubaria o programa - foi o defeito que esta linha ja teve.
+        # TypeError, e aí a base inteira é recusada como qualquer outro
+        # conteúdo fora do formato. Fora do try, esse erro escaparia e
+        # derrubaria o programa - foi o defeito que esta linha já teve.
         #
-        # Uso .get() com reserva, ao contrario de dados["equipamentos"]:
-        # arquivo antigo, gravado antes deste recurso existir, nao tem esta
-        # chave, e a reserva (o maior id que existe) e exatamente o
-        # comportamento que o programa tinha antes. Falta de contador nao
+        # Uso .get() com reserva, ao contrário de dados["equipamentos"]:
+        # arquivo antigo, gravado antes deste recurso existir, não tem esta
+        # chave, e a reserva (o maior id que existe) é exatamente o
+        # comportamento que o programa tinha antes. Falta de contador não
         # corrompe nada; falta de "equipamentos" corromperia.
         _marca_alta["equipamentos"] = max(dados.get("ultimo_id_equipamento", 0),
                                           max(equipamentos, default=0))
@@ -256,22 +256,22 @@ if __name__ == "__main__":
     # "python arquivo.py" para estudar sobrescrevia o inventario.json com
     # dados de exemplo - e apagava os equipamentos de verdade.
     #
-    # Aponto o modulo para um arquivo na pasta temporaria do sistema. Funciona
-    # porque salvar() e carregar() leem ARQUIVO_DADOS na hora em que sao
-    # chamadas, nao na hora em que foram escritas.
+    # Aponto o módulo para um arquivo na pasta temporária do sistema. Funciona
+    # porque salvar() e carregar() leem ARQUIVO_DADOS na hora em que são
+    # chamadas, não na hora em que foram escritas.
     import tempfile
     ARQUIVO_DADOS = os.path.join(tempfile.gettempdir(), "inventario_teste.json")
 
     equipamentos = {
         1: {"hostname":    "PC-CARTORIO-01",
-            "custodiante": "Escrivao de plantao",
-            "lotacao":     "Cartorio",
-            "descricao":   "Estacao de atendimento ao publico",
+            "custodiante": "Escrivão de plantão",
+            "lotacao":     "Cartório",
+            "descricao":   "Estação de atendimento ao público",
             "categoria":   CategoriaEquipamento.ESTACAO_TRABALHO},
     }
     falhas = {
         1: {"equipamento_id": 1,
-            "descricao":      "Sistema operacional sem atualizacao ha 8 meses",
+            "descricao":      "Sistema operacional sem atualização há 8 meses",
             "origem":         OrigemFalha.FALTA_ATUALIZACAO,
             "gravidade":      NivelGravidade.ALTA,
             "situacao":       SituacaoTratamento.ABERTA},
@@ -287,16 +287,16 @@ if __name__ == "__main__":
     print(f"  id {chave} - tipo {type(chave).__name__}  (tem que ser 'int')")
     print(f"  categoria: {lidos_equip[1]['categoria'].rotulo}")
     print(f"  gravidade: {lidos_falhas[1]['gravidade'].rotulo}")
-    print(f"  proximo id livre: {proximo_id_equipamento(lidos_equip)}")
+    print(f"  próximo id livre: {proximo_id_equipamento(lidos_equip)}")
 
     # assert: se a comparação for falsa, o programa para e avisa.
     # É a forma mais curta de testar que salvar() e carregar() são de fato
     # operações inversas uma da outra.
     assert lidos_equip == equipamentos, "os dados lidos diferem dos gravados"
     assert lidos_falhas == falhas, "as falhas lidas diferem das gravadas"
-    print("\nOK - o que saiu e o que voltou sao identicos.")
+    print("\nOK - o que saiu e o que voltou são idênticos.")
 
-    # --- o id nao volta a circular, nem depois de fechar o programa ---
+    # --- o id não volta a circular, nem depois de fechar o programa ---
     base = dict(lidos_equip)
     id_a = proximo_id_equipamento(base)
     base[id_a] = dict(base[1])
@@ -307,10 +307,10 @@ if __name__ == "__main__":
     base, _ = carregar()
     id_b = proximo_id_equipamento(base)
 
-    print(f"\nEntreguei o id {id_a}, exclui o registro e reiniciei.")
-    print(f"O proximo id foi {id_b} - o {id_a} nao voltou a circular.")
+    print(f"\nEntreguei o id {id_a}, excluí o registro e reiniciei.")
+    print(f"O próximo id foi {id_b} - o {id_a} não voltou a circular.")
     assert id_b > id_a, "o identificador foi reaproveitado"
-    print("\nOK - identificadores nao se repetem.")
+    print("\nOK - identificadores não se repetem.")
 
     os.remove(ARQUIVO_DADOS)   # limpa o arquivo de teste
-    print("\nA base real (inventario.json) nao foi tocada.")
+    print("\nA base real (inventario.json) não foi tocada.")
