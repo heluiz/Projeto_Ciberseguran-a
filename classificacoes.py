@@ -37,6 +37,16 @@ class CategoriaEquipamento(Enum):
     IMPRESSORA_REDE  = 4
     SISTEMA_INTERNO  = 5
     BANCO_DADOS      = 6
+    # "Outro" existe porque inventário de TI real sempre tem exceção: um
+    # nobreak, um switch, um scanner, um aparelho institucional. Sem ele o
+    # operador seria forçado a classificar errado, e dado errado é pior que
+    # dado genérico.
+    #
+    # E o Enum continua sendo conjunto fechado - OUTRO é um membro dele, não
+    # texto livre. O antídoto contra virar depósito de tudo já existe no
+    # sistema: a descrição é obrigatória no cadastro, então quem marca
+    # Outro precisa dizer o que é.
+    OUTRO            = 7
 
     @property
     def rotulo(self):
@@ -56,6 +66,7 @@ _ROTULOS_EQUIPAMENTO = {
     CategoriaEquipamento.IMPRESSORA_REDE:  "Impressora de rede",
     CategoriaEquipamento.SISTEMA_INTERNO:  "Sistema interno",
     CategoriaEquipamento.BANCO_DADOS:      "Banco de dados",
+    CategoriaEquipamento.OUTRO:            "Outro (ver descrição)",
 }
 
 
@@ -69,6 +80,10 @@ class OrigemFalha(Enum):
     SENHA_FRACA          = 3
     SERVICO_EXPOSTO      = 4
     PERMISSAO_INDEVIDA   = 5
+    # Mesma razão do OUTRO acima. O próprio enunciado diz que a lista de
+    # exemplos dele não é fechada, e a descrição da vulnerabilidade também
+    # é obrigatória.
+    OUTRA                = 6
 
     @property
     def rotulo(self):
@@ -81,6 +96,7 @@ _ROTULOS_ORIGEM = {
     OrigemFalha.SENHA_FRACA:        "Senha fraca",
     OrigemFalha.SERVICO_EXPOSTO:    "Serviço exposto indevidamente",
     OrigemFalha.PERMISSAO_INDEVIDA: "Permissão de acesso inadequada",
+    OrigemFalha.OUTRA:              "Outra (ver descrição)",
 }
 
 
