@@ -10,6 +10,7 @@ Atende aos requisitos 7 e 8, e à parte de cascata do requisito 6.
 """
 
 from arquivo import proximo_id
+import formatacao
 
 
 # Campos que podem ser corrigidos depois do cadastro.
@@ -42,7 +43,7 @@ def cadastrar(falhas, equipamento_id, descricao, origem, gravidade, situacao):
     id_novo = proximo_id(falhas)
     falhas[id_novo] = {
         "equipamento_id": equipamento_id,
-        "descricao":      descricao.strip(),
+        "descricao":      formatacao.frase(descricao),
         "origem":         origem,
         "gravidade":      gravidade,
         "situacao":       situacao,
@@ -101,7 +102,9 @@ def atualizar(falhas, id_falha, alteracoes):
         if campo not in CAMPOS_EDITAVEIS:
             raise ValueError(f"Campo nao editavel: '{campo}'")
         if campo == "descricao":
-            valor = valor.strip()
+            # Mesma regra de frase do cadastro: so a primeira letra em
+            # maiuscula, preservando acronimos como RDP ou CPD.
+            valor = formatacao.frase(valor)
         registro[campo] = valor
 
     return True

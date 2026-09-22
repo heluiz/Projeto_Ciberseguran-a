@@ -16,6 +16,7 @@ Atende aos requisitos 3, 4, 5 e 6.
 """
 
 from arquivo import proximo_id
+import formatacao
 
 
 # Campos que o usuário pode alterar depois do cadastro.
@@ -43,6 +44,26 @@ def _hostname_existe(equipamentos, hostname, ignorar_id=None):
     return False
 
 
+def _normalizar(campo, valor):
+    """
+    Aplica a formatação certa para cada campo.
+
+    Existe para que cadastrar() e atualizar() não possam divergir: a regra
+    está escrita num lugar só e as duas chamam esta função. Antes, cada uma
+    fazia o seu próprio .strip() - e bastava eu mexer numa para as duas
+    passarem a gravar diferente.
+    """
+    if campo == "hostname":
+        # Nome de máquina em rede é convencionalmente em caixa alta, e assim
+        # a listagem fica alinhada.
+        return valor.strip().upper()
+    if campo in ("custodiante", "lotacao"):
+        return formatacao.titulo(valor)
+    if campo == "descricao":
+        return formatacao.frase(valor)
+    return valor
+
+
 # ===========================================================================
 # REQUISITO 3 - cadastro
 # ===========================================================================
@@ -61,10 +82,10 @@ def cadastrar(equipamentos, hostname, custodiante, lotacao, descricao, categoria
 
     id_novo = proximo_id(equipamentos)
     equipamentos[id_novo] = {
-        "hostname":    hostname.strip(),
-        "custodiante": custodiante.strip(),
-        "lotacao":     lotacao.strip(),
-        "descricao":   descricao.strip(),
+        "hostname":    _normalizar("hostname", hostname),
+        "custodiante": _normalizar("custodiante", custodiante),
+        "lotacao":     _normalizar("lotacao", lotacao),
+        "descricao":   _normalizar("descricao", descricao),
         "categoria":   categoria,
     }
     return id_novo
@@ -128,8 +149,8 @@ def atualizar(equipamentos, id_equipamento, alteracoes):
         if campo == "hostname":
             if _hostname_existe(equipamentos, valor, ignorar_id=id_equipamento):
                 raise ValueError(f"Ja existe equipamento com o hostname '{valor}'")
-            valor = valor.strip()
-        registro[campo] = valor
+        # Mesma normalizacao do cadastro, pela mesma funcao.
+        registro[campo] = _normalizar(campo, valor)
 
     return True
 
