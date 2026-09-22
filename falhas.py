@@ -9,7 +9,7 @@ gravação em disco. Recebe dados, mexe no dicionário, devolve resultado.
 Atende aos requisitos 7 e 8, e à parte de cascata do requisito 6.
 """
 
-from arquivo import proximo_id
+from arquivo import proximo_id_falha
 import formatacao
 
 
@@ -40,7 +40,7 @@ def cadastrar(falhas, equipamento_id, descricao, origem, gravidade, situacao):
     as falhas sem montar equipamentos junto - que é exatamente o que faço no
     bloco de teste no fim deste arquivo.
     """
-    id_novo = proximo_id(falhas)
+    id_novo = proximo_id_falha(falhas)
     falhas[id_novo] = {
         "equipamento_id": equipamento_id,
         "descricao":      formatacao.frase(descricao),

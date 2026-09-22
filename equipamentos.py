@@ -15,7 +15,7 @@ dentro, todo teste exigiria uma pessoa na frente do teclado.
 Atende aos requisitos 3, 4, 5 e 6.
 """
 
-from arquivo import proximo_id
+from arquivo import proximo_id_equipamento
 import formatacao
 
 
@@ -80,7 +80,7 @@ def cadastrar(equipamentos, hostname, custodiante, lotacao, descricao, categoria
     if _hostname_existe(equipamentos, hostname):
         raise ValueError(f"Ja existe equipamento com o hostname '{hostname}'")
 
-    id_novo = proximo_id(equipamentos)
+    id_novo = proximo_id_equipamento(equipamentos)
     equipamentos[id_novo] = {
         "hostname":    _normalizar("hostname", hostname),
         "custodiante": _normalizar("custodiante", custodiante),
