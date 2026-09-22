@@ -67,6 +67,18 @@ problema e estão justificadas em comentário no próprio código.
   cadastro. Sem edição, um erro de digitação na severidade — que distorce a
   priorização, razão de ser do inventário — só teria conserto excluindo o
   equipamento inteiro e perdendo as demais vulnerabilidades dele.
+- **Categoria "Outro", com descrição obrigatória.** Um inventário real sempre
+  tem exceção — um nobreak, um switch, um scanner. Sem essa opção o operador
+  seria forçado a classificar errado, e dado errado é pior que dado genérico.
+  O Enum continua sendo conjunto fechado: "Outro" é um membro dele, não texto
+  livre, e o rótulo na tela avisa que a descrição — já obrigatória — é onde
+  se diz o que é.
+- **Hierarquia na listagem de vulnerabilidades.** O programa imprime texto
+  puro, sem cor nem negrito, então a hierarquia vem de ordem, posição e
+  espaço em branco: severidade numa coluna fixa à esquerda, descrição em
+  seguida, situação e categoria como legenda na linha de baixo. A largura da
+  coluna do identificador é calculada a partir da própria lista, para o
+  alinhamento não quebrar quando os IDs passarem de um dígito.
 - **Padronização do texto digitado.** Hostname em caixa alta, responsável e
   lotação com iniciais maiúsculas, descrição com a primeira letra maiúscula.
   A regra só formata quando o operador escreveu tudo em caixa alta ou tudo em
