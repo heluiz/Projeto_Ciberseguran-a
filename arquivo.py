@@ -121,6 +121,24 @@ def salvar(equipamentos, falhas):
     os.replace(temporario, ARQUIVO_DADOS)
 
 
+def _exige_texto(registro, campos):
+    """
+    Confere que os campos citados sao mesmo texto.
+
+    Sem isto, um "hostname": null no arquivo entraria na base sem reclamar e
+    so quebraria muito depois - na primeira busca, com uma mensagem que nao
+    ajuda ninguem a entender a causa. Erro de dado tem que aparecer na carga,
+    perto de onde nasceu.
+
+    Levanta TypeError, que a carga ja converte em BaseInvalida.
+    """
+    for campo in campos:
+        if not isinstance(registro[campo], str):
+            raise TypeError(
+                f"campo '{campo}' deveria ser texto, "
+                f"veio {type(registro[campo]).__name__}")
+
+
 def carregar():
     """
     Devolve (equipamentos, falhas). Arquivo inexistente devolve dois vazios -
@@ -153,37 +171,49 @@ def carregar():
         equipamentos = {}
         for chave, registro in dados["equipamentos"].items():
             # int(chave): o JSON devolve a chave como texto (ver salvar()).
-            equipamentos[int(chave)] = {
+            item = {
                 "hostname":    registro["hostname"],
                 "custodiante": registro["custodiante"],
                 "lotacao":     registro["lotacao"],
                 "descricao":   registro["descricao"],
                 "categoria":   CategoriaEquipamento(registro["categoria"]),
             }
+            _exige_texto(item, ("hostname", "custodiante",
+                                "lotacao", "descricao"))
+            equipamentos[int(chave)] = item
 
         falhas = {}
         for chave, registro in dados["falhas"].items():
-            falhas[int(chave)] = {
+            item = {
                 "equipamento_id": registro["equipamento_id"],
                 "descricao":      registro["descricao"],
                 "origem":         OrigemFalha(registro["origem"]),
                 "gravidade":      NivelGravidade(registro["gravidade"]),
                 "situacao":       SituacaoTratamento(registro["situacao"]),
             }
+            _exige_texto(item, ("descricao",))
+            if not isinstance(item["equipamento_id"], int):
+                raise TypeError("equipamento_id deveria ser um numero inteiro")
+            falhas[int(chave)] = item
+        # Restaura a marca d'agua. Isto fica DENTRO do try de proposito: um
+        # contador adulterado ("abc", null, uma lista) faz o max() levantar
+        # TypeError, e ai a base inteira e recusada como qualquer outro
+        # conteudo fora do formato. Fora do try, esse erro escaparia e
+        # derrubaria o programa - foi o defeito que esta linha ja teve.
+        #
+        # Uso .get() com reserva, ao contrario de dados["equipamentos"]:
+        # arquivo antigo, gravado antes deste recurso existir, nao tem esta
+        # chave, e a reserva (o maior id que existe) e exatamente o
+        # comportamento que o programa tinha antes. Falta de contador nao
+        # corrompe nada; falta de "equipamentos" corromperia.
+        _marca_alta["equipamentos"] = max(dados.get("ultimo_id_equipamento", 0),
+                                          max(equipamentos, default=0))
+        _marca_alta["falhas"] = max(dados.get("ultimo_id_falha", 0),
+                                    max(falhas, default=0))
     except (KeyError, ValueError, TypeError, AttributeError) as erro:
         raise BaseInvalida(
             f"conteúdo fora do formato esperado "
             f"({type(erro).__name__}: {erro})") from erro
-
-    # Restaura a marca d'agua. Uso .get() com reserva de proposito, ao
-    # contrario de dados["equipamentos"]: arquivo antigo, gravado antes deste
-    # recurso existir, nao tem esta chave - e a reserva (o maior id que
-    # existe) e exatamente o comportamento que o programa tinha antes. Falta
-    # de contador nao corrompe nada; falta de "equipamentos" corromperia.
-    _marca_alta["equipamentos"] = max(dados.get("ultimo_id_equipamento", 0),
-                                      max(equipamentos, default=0))
-    _marca_alta["falhas"] = max(dados.get("ultimo_id_falha", 0),
-                                max(falhas, default=0))
 
     return equipamentos, falhas
 
