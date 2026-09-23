@@ -3,9 +3,10 @@ equipamentos.py
 ---------------
 Operações sobre os equipamentos de TI: cadastrar, buscar, atualizar, excluir.
 
-Este módulo NÃO conversa com o usuário (nenhum input ou print) e NÃO grava em
-disco. Ele recebe dados prontos, mexe no dicionário e devolve resultado.
-Quem pergunta as coisas é o main.py; quem grava é o arquivo.py.
+Este módulo NÃO conversa com o usuário (nenhum input, e print só no bloco de
+teste) e NÃO grava em disco. Ele recebe dados prontos, mexe no dicionário e
+devolve resultado. Quem pergunta as coisas é o main.py; quem grava é o
+arquivo.py.
 
 Por que essa divisão?
 Porque assim eu consigo testar estas funções sem ninguém digitando nada -
@@ -126,7 +127,7 @@ def _normalizar(campo, valor):
 def cadastrar(equipamentos, hostname, custodiante, lotacao, descricao, categoria):
     """
     Cria um equipamento e devolve o id gerado.
-    Levanta ValueError se o hostname já estiver em uso.
+    Levanta ValueError se o hostname estiver fora do formato ou já em uso.
 
     Por que recusar hostname repetido? Porque hostname é nome de máquina na
     rede, e duas máquinas com o mesmo nome é um problema real de rede. O
@@ -196,12 +197,16 @@ def atualizar(equipamentos, id_equipamento, alteracoes):
     mudam; o resto fica como estava.
 
     Devolve True se atualizou, False se o id não existe.
-    Levanta ValueError se tentarem mexer num campo protegido.
+    Levanta ValueError num campo protegido ou num hostname inválido ou
+    repetido - e aí nada muda, nem os outros campos pedidos.
     """
     registro = equipamentos.get(id_equipamento)
     if registro is None:
         return False
 
+    # Dois laços de propósito: primeiro confiro TUDO, depois aplico. Num laço
+    # só, um hostname recusado no meio deixaria os campos anteriores já
+    # trocados - metade da alteração feita, sem ninguém pedir.
     for campo, valor in alteracoes.items():
         if campo not in CAMPOS_EDITAVEIS:
             raise ValueError(f"Campo não editável: '{campo}'")
@@ -211,6 +216,8 @@ def atualizar(equipamentos, id_equipamento, alteracoes):
                 raise ValueError(f"Hostname inválido: {problema}")
             if _hostname_existe(equipamentos, valor, ignorar_id=id_equipamento):
                 raise ValueError(f"Já existe equipamento com o hostname '{valor}'")
+
+    for campo, valor in alteracoes.items():
         # Mesma normalização do cadastro, pela mesma função.
         registro[campo] = _normalizar(campo, valor)
 
@@ -290,6 +297,16 @@ if __name__ == "__main__":
         atualizar(equipamentos, 1, {"id": 50})
     except ValueError as erro:
         print(f"Campo protegido: {erro}")
+
+    # Tudo ou nada: o hostname repetido derruba a alteração inteira, e o
+    # custodiante, que vinha antes no dicionário, também não pode mudar.
+    try:
+        atualizar(equipamentos, 1, {"custodiante": "Outro",
+                                    "hostname": "srv-arquivo"})
+    except ValueError as erro:
+        print(f"Recusada inteira: {erro}")
+    custodiante = equipamentos[1]["custodiante"]
+    assert custodiante == "Investigador de plantão", "mudou pela metade"
 
     # --- Requisito 6 ---
     print(f"\nExcluindo id 2: {excluir(equipamentos, 2)}")

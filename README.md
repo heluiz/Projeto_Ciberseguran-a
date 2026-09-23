@@ -21,9 +21,9 @@ python main.py
 ## Estrutura
 
 O projeto é dividido em seis módulos, cada um com uma responsabilidade única.
-Apenas o `main.py` interage com o usuário — os demais não possuem `input()` nem
-`print()`, o que permite testá-los isoladamente executando cada arquivo
-diretamente (`python equipamentos.py`, por exemplo).
+Apenas o `main.py` interage com o usuário — nos demais não há `input()`, e
+`print()` só aparece no bloco de teste, o que permite testá-los isoladamente
+executando cada arquivo diretamente (`python equipamentos.py`, por exemplo).
 
 | Arquivo | Responsabilidade |
 | --- | --- |
@@ -54,12 +54,18 @@ diretamente (`python equipamentos.py`, por exemplo).
 As escolhas abaixo não são exigidas pelo enunciado. Vieram da análise do
 problema e estão justificadas em comentário no próprio código.
 
-- **Gravação atômica.** A base é escrita num arquivo temporário que só então
-  substitui o definitivo (`os.replace`). Uma queda de energia no meio da
-  escrita custa a última alteração, nunca a base inteira.
-- **Validação na carga.** Arquivo corrompido ou adulterado faz o programa
-  recusar abrir, explicando o motivo. Abrir com base parcial seria pior: a
-  primeira gravação sobrescreveria o arquivo bom.
+- **Gravação atômica.** A base é escrita num arquivo temporário, forçada
+  para o disco (`os.fsync`) e só então substitui o definitivo
+  (`os.replace`). Uma queda de energia no meio da escrita custa a última
+  alteração, nunca a base inteira.
+- **Validação na carga.** Arquivo corrompido, adulterado ou salvo em outra
+  codificação faz o programa recusar abrir, explicando o motivo. Isso inclui
+  identificador fora do formato (`"01"`) e vulnerabilidade que aponta para um
+  equipamento inexistente. Abrir com base parcial seria pior: a primeira
+  gravação sobrescreveria o arquivo bom.
+- **Erro no meio de uma ação.** Se uma gravação falhar (disco cheio, arquivo
+  travado por outro programa), o programa avisa e recarrega a base do disco.
+  A tela nunca mostra um cadastro que não foi gravado.
 - **Identificadores que não se repetem.** O maior id já entregue fica gravado
   na própria base, então excluir um registro não devolve o número ao rodízio.
   Uma anotação externa apontando para "equipamento 2" continua significando a
@@ -86,7 +92,7 @@ problema e estão justificadas em comentário no próprio código.
   máquina, e da documentação da Microsoft para Active Directory. O formato
   é conferido na hora em que o operador digita, não depois de ele preencher
   os outros campos.
-- **Nenhuma confirmação antes de gravar.** Toda ação que altera dados só
+- **Mensagem de sucesso só depois de gravar.** Toda ação que altera dados só
   mostra a mensagem de sucesso depois que o dado já está no disco. E os
   testes embutidos usam um arquivo temporário: rodar `python arquivo.py`
   não toca na base real.
@@ -94,7 +100,8 @@ problema e estão justificadas em comentário no próprio código.
   lotação com iniciais maiúsculas, descrição com a primeira letra maiúscula.
   A regra só formata quando o operador escreveu tudo em caixa alta ou tudo em
   baixa; texto com maiúsculas e minúsculas misturadas é respeitado, o que
-  preserva acrônimos como TI, CPD e RDP.
+  preserva acrônimos no meio do texto ("Setor de TI", "porta RDP exposta") e
+  nomes como iDRAC e pfSense.
 
 ## Limitações conhecidas
 
@@ -106,8 +113,8 @@ problema e estão justificadas em comentário no próprio código.
 
 ## Base de dados
 
-Os dados ficam em `inventario.json`, criado na primeira execução ao lado do
-código. O arquivo não é versionado: o repositório guarda código, não dado
+Os dados ficam em `inventario.json`, criado ao lado do código na primeira
+gravação. O arquivo não é versionado: o repositório guarda código, não dado
 gerado — e, num sistema de segurança, o inventário de vulnerabilidades é
 justamente o que não se publica.
 
