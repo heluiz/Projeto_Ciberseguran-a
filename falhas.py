@@ -166,8 +166,8 @@ def excluir_por_equipamento(falhas, equipamento_id):
     Apaga todas as falhas de um equipamento e devolve quantas foram apagadas.
 
     Por que montar a lista de ids ANTES de apagar, em vez de apagar dentro do
-    laço? Porque alterar um dicionário enquanto se percorre ele levanta
-    RuntimeError em Python. Primeiro decido o que sai, depois saio apagando.
+    laço? Porque apagar chaves de um dicionário enquanto se percorre ele
+    levanta RuntimeError em Python. Primeiro decido o que sai, depois apago.
 
     As três linhas abaixo são uma "list comprehension": um laço escrito de
     forma compacta. Lê-se de trás para frente - "para cada par no dicionário,
