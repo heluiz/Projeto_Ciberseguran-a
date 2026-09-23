@@ -141,7 +141,7 @@ def linha_da_tabela(valores, larguras, a_direita):
     """
     Uma linha da tabela: cada valor na sua coluna, dois espaços entre elas.
 
-    zip() anda pelas três listas ao mesmo tempo - o primeiro valor com a
+    zip() anda pelas três sequências ao mesmo tempo - o primeiro valor com a
     primeira largura e o primeiro alinhamento, e assim por diante.
     """
     celulas = [coluna(valor, largura, direita)
@@ -489,7 +489,7 @@ def acao_cadastrar_falha(base_equipamentos, base_falhas):
     id_equipamento = ler_inteiro("  ID do equipamento: ")
 
     # Esta é a checagem que o falhas.py não faz, porque ele não enxerga os
-    # equipamentos. É aqui que ela cabe: o main é o único que vê os dois.
+    # equipamentos. É aqui que ela cabe: quem coordena os dois é o main.
     if equipamentos.buscar_por_id(base_equipamentos, id_equipamento) is None:
         print(f"\n  ! Nenhum equipamento com o ID {id_equipamento}.")
         return
@@ -626,9 +626,9 @@ def acao_pendentes(base_equipamentos, base_falhas):
 # O MENU
 #
 # Uso um DICIONÁRIO para ligar o número digitado à função correspondente,
-# em vez de uma sequência de if/elif. Vantagens: acrescentar uma opção nova
-# é uma linha só (foi assim que a 10 entrou), e não existe risco de esquecer
-# um elif no meio da cadeia.
+# em vez de uma sequência de if/elif. Vantagens: ligar uma opção nova
+# custa uma linha aqui e um print no exibir_menu() (foi assim que a 10
+# entrou), e não existe risco de esquecer um elif no meio da cadeia.
 #
 # É, de quebra, um segundo uso de dicionário no projeto (requisito 9) - aqui
 # não para guardar dados, mas para escolher comportamento.
