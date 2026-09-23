@@ -28,10 +28,10 @@ executando cada arquivo diretamente (`python equipamentos.py`, por exemplo).
 | Arquivo | Responsabilidade |
 | --- | --- |
 | `classificacoes.py` | Enums: tipo de equipamento, origem, gravidade e situação da falha |
-| `formatacao.py` | Padronização de maiúsculas e minúsculas do texto digitado |
+| `formatacao.py` | Padronização de maiúsculas e minúsculas do texto digitado e comparação sem acento nas buscas |
 | `arquivo.py` | Gravação e leitura da base em JSON, validação na carga e geração de identificadores |
-| `equipamentos.py` | CRUD dos equipamentos de TI |
-| `falhas.py` | Cadastro, listagem, correção e exclusão das vulnerabilidades, incluindo a cascata |
+| `equipamentos.py` | CRUD e buscas dos equipamentos de TI |
+| `falhas.py` | Cadastro, listagem, correção e exclusão das vulnerabilidades, incluindo a cascata e a lista de pendentes |
 | `main.py` | Menu textual, tratamento de erros e coordenação entre módulos |
 
 ## Requisitos atendidos
@@ -86,6 +86,19 @@ problema e estão justificadas em comentário no próprio código.
   seguida, situação e categoria como legenda na linha de baixo. A largura da
   coluna do identificador é calculada a partir da própria lista, para o
   alinhamento não quebrar quando os IDs passarem de um dígito.
+- **Mais formas de busca.** Além de ID e hostname, a busca aceita
+  responsável, lotação e categoria — o operador costuma lembrar de quem usa
+  a máquina e de onde ela fica, não do nome dela. As buscas por texto aceitam
+  parte do nome e ignoram maiúscula e acento: "plantao" encontra "Plantão".
+  Um resultado mostra a ficha completa; vários, a tabela da listagem.
+- **Relatório de pendentes (opção 10).** As vulnerabilidades abertas ou em
+  tratamento de todos os equipamentos, da mais grave para a menos, com o
+  hostname de cada uma. Responde à primeira pergunta de quem cuida da
+  segurança: o que corrigir agora.
+- **Listagem que cabe na tela.** Uma linha por equipamento. Cada coluna tem a
+  largura do maior valor da lista, com um teto; texto à esquerda, número à
+  direita; dois espaços entre colunas. A linha mais larga possível tem 113
+  caracteres, dentro das 120 colunas com que o Windows Terminal abre.
 - **Hostname no formato que a rede aceita.** Só letras sem acento, números
   e hífen; não começa nem termina com hífen; no máximo 63 caracteres; e não
   pode ser só números. As regras vêm das RFC 952 e 1123, que definem nome de

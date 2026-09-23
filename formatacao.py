@@ -16,7 +16,13 @@ e minúsculas, formatou de propósito, e o programa respeita.
 
 Isso protege acrônimos, que são comuns num inventário de TI: "Setor de TI"
 chega misturado e passa intacto, enquanto "setor de ti" vira "Setor de Ti".
+
+A BUSCA
+O mesmo cuidado com o texto vale para procurar: para_busca() tira acento e
+diferença de maiúscula, para "plantao" encontrar "Plantão".
 """
+
+import unicodedata
 
 # Partículas que ficam em minúscula quando não são a primeira palavra.
 # Sem elas, "Sala de Máquinas" viraria "Sala De Máquinas" - errado em
@@ -105,6 +111,27 @@ def frase(texto):
     return texto
 
 
+def para_busca(texto):
+    """
+    Versão do texto usada só para COMPARAR numa busca: sem acento, sem
+    diferença entre maiúscula e minúscula, sem espaço sobrando.
+
+        "Setor de Informática"  -> "setor de informatica"
+        "  PLANTÃO "            -> "plantao"
+
+    Assim o operador encontra "Plantão" digitando "plantao", do jeito que se
+    digita com pressa. O texto gravado não muda - isto serve só para comparar.
+
+    casefold() é o lower() feito para comparação: a documentação do Python o
+    recomenda para comparar sem diferenciar maiúsculas. O acento sai em dois
+    passos: normalize("NFD") separa cada letra acentuada em letra + acento
+    ("ã" vira "a" seguido do "~"), e combining() reconhece o acento solto,
+    que eu descarto.
+    """
+    decomposto = unicodedata.normalize("NFD", " ".join(texto.split()).casefold())
+    return "".join(c for c in decomposto if not unicodedata.combining(c))
+
+
 if __name__ == "__main__":
     casos_titulo = [
         ("escrivão de plantão",   "Escrivão de Plantão"),
@@ -123,6 +150,11 @@ if __name__ == "__main__":
         ("iDRAC com senha padrão",  "iDRAC com senha padrão"),
         ("pfSense desatualizado",   "pfSense desatualizado"),
     ]
+    casos_busca = [
+        ("Setor de Informática",    "setor de informatica"),
+        ("  PLANTÃO ",              "plantao"),
+        ("Cartório",                "cartorio"),
+    ]
 
     print("--- titulo() ---")
     for entrada, esperado in casos_titulo:
@@ -134,6 +166,13 @@ if __name__ == "__main__":
     print("\n--- frase() ---")
     for entrada, esperado in casos_frase:
         obtido = frase(entrada)
+        marca = "ok " if obtido == esperado else "ERRO"
+        print(f"  {marca} {entrada!r:28} -> {obtido!r}")
+        assert obtido == esperado, f"esperava {esperado!r}"
+
+    print("\n--- para_busca() ---")
+    for entrada, esperado in casos_busca:
+        obtido = para_busca(entrada)
         marca = "ok " if obtido == esperado else "ERRO"
         print(f"  {marca} {entrada!r:28} -> {obtido!r}")
         assert obtido == esperado, f"esperava {esperado!r}"

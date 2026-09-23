@@ -7,10 +7,12 @@ Mesma regra do equipamentos.py: nenhum input(), print() só no bloco de
 teste, nenhuma gravação em disco. Recebe dados, mexe no dicionário, devolve
 resultado.
 
-Atende aos requisitos 7 e 8, e à parte de cascata do requisito 6.
+Atende aos requisitos 7 e 8 e à parte de cascata do requisito 6. Além do
+enunciado, monta a lista de pendentes do relatório da opção 10.
 """
 
 from arquivo import proximo_id_falha
+from classificacoes import SituacaoTratamento
 import formatacao
 
 
@@ -78,6 +80,29 @@ def listar_por_equipamento(falhas, equipamento_id):
     # abre a ficha de um equipamento quer ver o problema crítico no topo.
     encontradas.sort(key=lambda par: par[1]["gravidade"].value, reverse=True)
     return encontradas
+
+
+# Situações que ainda pedem ação. Corrigida e Aceita como risco ficam de
+# fora: na primeira o problema acabou; na segunda, alguém com autoridade
+# decidiu conviver com ele - e isso já está registrado.
+SITUACOES_PENDENTES = (SituacaoTratamento.ABERTA, SituacaoTratamento.EM_TRATAMENTO)
+
+
+def listar_pendentes(falhas):
+    """
+    Devolve os pares (id, registro) das vulnerabilidades pendentes de TODOS
+    os equipamentos, da mais grave para a menos - a base do relatório da
+    opção 10, que vai além do enunciado.
+
+    Mesma ordenação do listar_por_equipamento(): gravidade decrescente e,
+    no empate, a ordem de cadastro. Isso porque o sort() do Python é
+    estável: não troca de lugar dois itens com a mesma gravidade.
+    """
+    pendentes = [(id_falha, registro)
+                 for id_falha, registro in falhas.items()
+                 if registro["situacao"] in SITUACOES_PENDENTES]
+    pendentes.sort(key=lambda par: par[1]["gravidade"].value, reverse=True)
+    return pendentes
 
 
 def atualizar(falhas, id_falha, alteracoes):
@@ -164,7 +189,7 @@ def excluir_por_equipamento(falhas, equipamento_id):
 # Teste: requisitos 7, 8 e a cascata do 6, sem ninguém digitar nada.
 # ===========================================================================
 if __name__ == "__main__":
-    from classificacoes import OrigemFalha, NivelGravidade, SituacaoTratamento
+    from classificacoes import OrigemFalha, NivelGravidade
 
     falhas = {}
 
@@ -207,6 +232,11 @@ if __name__ == "__main__":
     # --- acompanhamento do tratamento ---
     atualizar(falhas, 1, {"situacao": SituacaoTratamento.CORRIGIDA})
     print(f"Falha 1 agora está: {falhas[1]['situacao'].rotulo}")
+
+    # --- relatório de pendentes (opção 10) ---
+    pendentes = [id_falha for id_falha, _ in listar_pendentes(falhas)]
+    print(f"Pendentes, da mais grave: {pendentes}  (a 1 saiu: foi corrigida)")
+    assert pendentes == [2, 3, 4], "o relatório de pendentes errou"
 
     # --- exclusão de uma vulnerabilidade só ---
     print(f"\nExcluindo a falha 3: {excluir(falhas, 3)}")
