@@ -3,8 +3,9 @@ main.py
 -------
 O programa em si: menu, leitura do que o usuário digita e tratamento de erros.
 
-Este é o único arquivo que conversa com o usuário. Nenhum dos outros tem
-input() nem print() - é o que permitiu testar cada um isoladamente.
+Este é o único arquivo que conversa com o usuário. Nos outros não há
+input(), e print() só aparece no bloco de teste de cada um - é o que
+permitiu testar cada um isoladamente.
 
 Aqui também moram as regras que envolvem MAIS DE UM módulo, como a exclusão
 em cascata: nem equipamentos.py nem falhas.py enxergam os dados um do outro,
@@ -93,9 +94,6 @@ def confirmar(mensagem):
     return input(f"{mensagem} (s/N): ").strip().lower() == "s"
 
 
-# ===========================================================================
-# EXIBIÇÃO
-# ===========================================================================
 def ler_hostname(mensagem, obrigatorio=True):
     """
     Lê um hostname e só aceita um nome válido na rede.
@@ -117,6 +115,9 @@ def ler_hostname(mensagem, obrigatorio=True):
         print(f"  ! Hostname inválido: {problema}.")
 
 
+# ===========================================================================
+# EXIBIÇÃO
+# ===========================================================================
 def coluna(texto, largura):
     """
     Encaixa o texto numa coluna de largura fixa.
@@ -317,8 +318,9 @@ def acao_atualizar(base_equipamentos, base_falhas):
     print("\n  Deixe em branco para manter o valor atual.\n")
 
     # Monto um dicionário só com o que o usuário realmente quis mudar, e
-    # entrego tudo de uma vez ao módulo. Assim uma alteração recusada (por
-    # exemplo hostname duplicado) não deixa metade das mudanças aplicadas.
+    # entrego tudo de uma vez ao módulo, que confere tudo antes de aplicar.
+    # Assim uma alteração recusada (por exemplo hostname duplicado) não
+    # deixa metade das mudanças aplicadas.
     alteracoes = {}
 
     novo = ler_hostname(f"  Hostname [{registro['hostname']}]: ",
@@ -549,7 +551,8 @@ def main():
 
     # Carrego a base UMA vez, no início. Durante a execução tudo acontece na
     # memória (rápido), e cada alteração é gravada logo em seguida - assim
-    # um fechamento inesperado não leva o trabalho junto.
+    # um fechamento inesperado não leva o trabalho junto. A única outra
+    # carga acontece depois de um erro no meio de uma ação (ver abaixo).
     base_equipamentos, base_falhas = arquivo.carregar()
     print(f"\n  Base carregada: {len(base_equipamentos)} equipamento(s), "
           f"{len(base_falhas)} vulnerabilidade(s).")
@@ -569,6 +572,11 @@ def main():
 
         try:
             acao(base_equipamentos, base_falhas)
+        except EOFError:
+            # Ctrl+Z (Windows) ou Ctrl+D no meio de uma ação: o operador quer
+            # sair. Não é erro inesperado - deixo subir até o encerramento
+            # limpo no fim do arquivo.
+            raise
         except Exception as erro:
             # Rede de segurança. Se algo inesperado escapar de uma ação, o
             # programa avisa e volta ao menu, em vez de fechar e perder a
@@ -578,18 +586,27 @@ def main():
             # biblioteca, porque esconderia bugs. Num programa de menu é o
             # oposto: fechar na cara do usuário é pior do que continuar.
             print(f"\n  ! Erro inesperado: {erro}")
+            # A ação pode ter parado no meio: dicionário já alterado e
+            # gravação não feita (disco cheio, arquivo travado por outro
+            # programa). Volto ao que está no disco, a única versão garantida.
+            # Sem isso, a tela mostraria um cadastro que não existe no
+            # arquivo - e a próxima gravação bem-sucedida o salvaria calada.
+            base_equipamentos, base_falhas = arquivo.carregar()
+            print("  ! Base recarregada do disco: o que não chegou a ser "
+                  "gravado foi descartado.")
 
 
 if __name__ == "__main__":
     try:
         main()
     except arquivo.BaseInvalida as erro:
-        # A base existe mas não pode ser lida. Recuso abrir de propósito: se
-        # eu abrisse com base vazia, a primeira gravação sobrescreveria o
-        # arquivo e o estrago viraria permanente.
-        print(f"\n  ! A base de dados está corrompida: {erro}")
+        # A base existe mas não pode ser lida - corrompida, adulterada ou
+        # bloqueada por outro programa. Paro de propósito: se eu seguisse com
+        # base vazia, a primeira gravação sobrescreveria o arquivo e o
+        # estrago viraria permanente.
+        print(f"\n  ! Não foi possível carregar a base de dados: {erro}")
         print(f"  ! Arquivo: {arquivo.ARQUIVO_DADOS}")
-        print("  ! O programa não vai abrir, para não sobrescrever dados bons.")
+        print("  ! O programa para aqui, para não sobrescrever dados bons.")
         print("  ! Corrija o arquivo, ou mova-o para fora da pasta")
         print("    e o programa começa uma base nova.\n")
     except (KeyboardInterrupt, EOFError):

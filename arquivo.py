@@ -22,6 +22,17 @@ from classificacoes import (
 )
 
 
+class BaseInvalida(Exception):
+    """
+    A base em disco não pode ser carregada: está ilegível, corrompida ou
+    foi adulterada.
+
+    Crio uma exceção própria para separar "o arquivo de dados está ruim" de
+    qualquer outro erro do Python. Assim o main.py consegue tratar só este
+    caso e dar uma mensagem útil, em vez de despejar um traceback.
+    """
+
+
 # ===========================================================================
 # ONDE O ARQUIVO FICA
 #
@@ -32,16 +43,6 @@ from classificacoes import (
 #
 # __file__ é o caminho deste próprio arquivo. Pegando a pasta dele, o
 # inventario.json fica sempre ao lado do código, rode eu de onde rodar.
-class BaseInvalida(Exception):
-    """
-    A base em disco está corrompida ou foi adulterada.
-
-    Crio uma exceção própria para separar "o arquivo de dados está ruim" de
-    qualquer outro erro do Python. Assim o main.py consegue tratar só este
-    caso e dar uma mensagem útil, em vez de despejar um traceback.
-    """
-
-
 # ===========================================================================
 PASTA_DO_PROJETO = os.path.dirname(os.path.abspath(__file__))
 ARQUIVO_DADOS = os.path.join(PASTA_DO_PROJETO, "inventario.json")
@@ -118,6 +119,12 @@ def salvar(equipamentos, falhas):
         # ensure_ascii=False mantém os acentos como acentos, em vez de
         # virarem códigos tipo \u00e7.
         json.dump(dados, f, indent=4, ensure_ascii=False)
+        # flush() tira o texto da memória do Python; fsync() obriga o
+        # sistema a gravar no disco de verdade. Sem os dois, o sistema pode
+        # registrar a troca de nome abaixo antes do conteúdo - e, numa queda
+        # de energia, o inventario.json voltaria vazio.
+        f.flush()
+        os.fsync(f.fileno())
     os.replace(temporario, ARQUIVO_DADOS)
 
 
@@ -139,6 +146,38 @@ def _exige_texto(registro, campos):
                 f"veio {type(registro[campo]).__name__}")
 
 
+def _exige_inteiro(valor, nome):
+    """
+    Confere que o valor é um número inteiro de verdade.
+
+    isinstance(valor, int) sozinho não basta: True e False também passam,
+    porque em Python bool é um tipo de int. E um contador 10.0 (float)
+    geraria o id 11.0, gravado como "11.0" - que a própria carga recusaria
+    na próxima vez que o programa abrisse.
+
+    Levanta TypeError, que a carga já converte em BaseInvalida.
+    """
+    if isinstance(valor, bool) or not isinstance(valor, int):
+        raise TypeError(f"{nome} deveria ser um número inteiro, veio {valor!r}")
+
+
+def _chave_para_id(chave):
+    """
+    Converte a chave do JSON ("7") de volta para o id inteiro (7).
+
+    Exijo exatamente a forma que o salvar() escreve. O int() sozinho aceita
+    "07", " 7" e "+7" - e aí "7" e "07" virariam o mesmo id, um registro
+    apagando o outro em silêncio. Id zero ou negativo o programa nunca gera,
+    então também é sinal de arquivo mexido à mão.
+
+    Levanta ValueError, que a carga já converte em BaseInvalida.
+    """
+    numero = int(chave)
+    if str(numero) != chave or numero < 1:
+        raise ValueError(f"id fora do formato: {chave!r}")
+    return numero
+
+
 def carregar():
     """
     Devolve (equipamentos, falhas). Arquivo inexistente devolve dois vazios -
@@ -152,17 +191,30 @@ def carregar():
     if not os.path.exists(ARQUIVO_DADOS):
         return {}, {}
 
+    # utf-8-sig lê o arquivo com ou sem BOM - a marca invisível que o Bloco
+    # de Notas e o PowerShell às vezes põem no início. Para gravar, o
+    # salvar() continua usando utf-8 puro.
     try:
-        with open(ARQUIVO_DADOS, "r", encoding="utf-8") as f:
+        with open(ARQUIVO_DADOS, "r", encoding="utf-8-sig") as f:
             dados = json.load(f)
-    except json.JSONDecodeError as erro:
-        raise BaseInvalida(f"não é um JSON válido ({erro})") from erro
     except OSError as erro:
         raise BaseInvalida(f"não foi possível abrir o arquivo ({erro})") from erro
+    except UnicodeDecodeError as erro:
+        # Arquivo salvo em outra codificação (ANSI, UTF-16...). Este except
+        # vem ANTES do próximo porque UnicodeDecodeError é um tipo de
+        # ValueError - na ordem inversa, ele nunca seria alcançado.
+        raise BaseInvalida("o arquivo não está em UTF-8 - foi salvo em "
+                           "outra codificação") from erro
+    except (ValueError, RecursionError) as erro:
+        # ValueError cobre o JSON mal escrito (JSONDecodeError é um tipo de
+        # ValueError) e número com milhares de dígitos. RecursionError: um
+        # arquivo com milhares de colchetes aninhados estoura o leitor.
+        raise BaseInvalida(f"não é um JSON válido ({erro})") from erro
 
     # A conversão inteira vai dentro de um try. Campo faltando, código de Enum
-    # inválido ou chave não numérica levam todos à mesma conclusão: a base não
-    # está confiável. Não adianta tratar cada um de um jeito diferente.
+    # inválido, id fora do formato ou vulnerabilidade sem equipamento levam
+    # todos à mesma conclusão: a base não está confiável. Não adianta tratar
+    # cada um de um jeito diferente.
     #
     # Uso dados["equipamentos"] e não dados.get(...): com o .get(), um arquivo
     # sem essa chave carregaria como base vazia, e a primeira gravação apagaria
@@ -170,7 +222,6 @@ def carregar():
     try:
         equipamentos = {}
         for chave, registro in dados["equipamentos"].items():
-            # int(chave): o JSON devolve a chave como texto (ver salvar()).
             item = {
                 "hostname":    registro["hostname"],
                 "custodiante": registro["custodiante"],
@@ -180,7 +231,9 @@ def carregar():
             }
             _exige_texto(item, ("hostname", "custodiante",
                                 "lotacao", "descricao"))
-            equipamentos[int(chave)] = item
+            # O JSON devolve a chave como texto; ela volta a ser o id
+            # inteiro (ver salvar() e _chave_para_id()).
+            equipamentos[_chave_para_id(chave)] = item
 
         falhas = {}
         for chave, registro in dados["falhas"].items():
@@ -192,24 +245,34 @@ def carregar():
                 "situacao":       SituacaoTratamento(registro["situacao"]),
             }
             _exige_texto(item, ("descricao",))
-            if not isinstance(item["equipamento_id"], int):
-                raise TypeError("equipamento_id deveria ser um número inteiro")
-            falhas[int(chave)] = item
+            _exige_inteiro(item["equipamento_id"], "equipamento_id")
+            # Integridade referencial: toda vulnerabilidade tem de apontar
+            # para um equipamento que existe. Órfã, ela não apareceria em tela
+            # nenhuma - e seria "herdada" pelo equipamento que um dia
+            # recebesse aquele id.
+            if item["equipamento_id"] not in equipamentos:
+                raise ValueError(
+                    f"a vulnerabilidade {chave} aponta para o equipamento "
+                    f"{item['equipamento_id']}, que não existe")
+            falhas[_chave_para_id(chave)] = item
         # Restaura a marca d'água. Isto fica DENTRO do try de propósito: um
-        # contador adulterado ("abc", null, uma lista) faz o max() levantar
-        # TypeError, e aí a base inteira é recusada como qualquer outro
-        # conteúdo fora do formato. Fora do try, esse erro escaparia e
-        # derrubaria o programa - foi o defeito que esta linha já teve.
+        # contador adulterado ("abc", null, 10.0) é recusado pelo
+        # _exige_inteiro(), e aí a base inteira é recusada como qualquer
+        # outro conteúdo fora do formato. Fora do try, esse erro escaparia e
+        # derrubaria o programa - foi o defeito que esta parte já teve.
         #
         # Uso .get() com reserva, ao contrário de dados["equipamentos"]:
         # arquivo antigo, gravado antes deste recurso existir, não tem esta
         # chave, e a reserva (o maior id que existe) é exatamente o
         # comportamento que o programa tinha antes. Falta de contador não
         # corrompe nada; falta de "equipamentos" corromperia.
-        _marca_alta["equipamentos"] = max(dados.get("ultimo_id_equipamento", 0),
+        ultimo_equipamento = dados.get("ultimo_id_equipamento", 0)
+        ultimo_falha = dados.get("ultimo_id_falha", 0)
+        _exige_inteiro(ultimo_equipamento, "ultimo_id_equipamento")
+        _exige_inteiro(ultimo_falha, "ultimo_id_falha")
+        _marca_alta["equipamentos"] = max(ultimo_equipamento,
                                           max(equipamentos, default=0))
-        _marca_alta["falhas"] = max(dados.get("ultimo_id_falha", 0),
-                                    max(falhas, default=0))
+        _marca_alta["falhas"] = max(ultimo_falha, max(falhas, default=0))
     except (KeyError, ValueError, TypeError, AttributeError) as erro:
         raise BaseInvalida(
             f"conteúdo fora do formato esperado "
@@ -311,6 +374,34 @@ if __name__ == "__main__":
     print(f"O próximo id foi {id_b} - o {id_a} não voltou a circular.")
     assert id_b > id_a, "o identificador foi reaproveitado"
     print("\nOK - identificadores não se repetem.")
+
+    # --- bases adulteradas: todas recusadas com mensagem, nenhum traceback ---
+    # Cada valor é o conteúdo exato do arquivo, em bytes.
+    bom = {"hostname": "PC-01", "custodiante": "A", "lotacao": "B",
+           "descricao": "C", "categoria": 1}
+    orfa = {"equipamento_id": 9, "descricao": "D",
+            "origem": 1, "gravidade": 1, "situacao": 1}
+    adulteradas = {
+        "id '01'": json.dumps({"equipamentos": {"01": bom},
+                               "falhas": {}}).encode(),
+        "contador 10.0": json.dumps({"equipamentos": {}, "falhas": {},
+                                     "ultimo_id_equipamento": 10.0}).encode(),
+        "falha órfã": json.dumps({"equipamentos": {"1": bom},
+                                  "falhas": {"1": orfa}}).encode(),
+        # Salvo em ANSI, como o Bloco de Notas antigo faz: o "ó" vira um
+        # byte que não existe em UTF-8.
+        "salva em ANSI": '{"lotacao": "Cartório"}'.encode("cp1252"),
+    }
+    print()
+    for nome, conteudo in adulteradas.items():
+        with open(ARQUIVO_DADOS, "wb") as f:
+            f.write(conteudo)
+        try:
+            carregar()
+            raise AssertionError(f"aceitou a base adulterada: {nome}")
+        except BaseInvalida as erro:
+            print(f"Recusada ({nome}): {erro}")
+    print("\nOK - base adulterada é recusada com mensagem, sem traceback.")
 
     os.remove(ARQUIVO_DADOS)   # limpa o arquivo de teste
     print("\nA base real (inventario.json) não foi tocada.")

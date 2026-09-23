@@ -24,6 +24,17 @@ chega misturado e passa intacto, enquanto "setor de ti" vira "Setor de Ti".
 PARTICULAS = ("de", "da", "do", "das", "dos", "e")
 
 
+def _sem_ordinais(texto):
+    """
+    O texto sem ª e º, usado só para conferir maiúsculas e minúsculas.
+
+    O Python conta ª e º como letras minúsculas: "1ª DELEGACIA".isupper()
+    dá False. Sem este cuidado, um texto digitado com Caps Lock passaria por
+    "misturado" e nunca seria padronizado.
+    """
+    return texto.replace("ª", "").replace("º", "")
+
+
 def ja_formatado(texto):
     """
     True se o texto tem maiúsculas E minúsculas misturadas.
@@ -32,7 +43,8 @@ def ja_formatado(texto):
     significa que o operador não se preocupou com formatação. Qualquer outra
     coisa significa que ele escolheu como escrever.
     """
-    return not texto.isupper() and not texto.islower()
+    letras = _sem_ordinais(texto)
+    return not letras.isupper() and not letras.islower()
 
 
 def titulo(texto):
@@ -42,11 +54,14 @@ def titulo(texto):
 
         "escrivão de plantão"  -> "Escrivão de Plantão"
         "ESCRIVÃO DE PLANTÃO"  -> "Escrivão de Plantão"
+        "1ª DELEGACIA"         -> "1ª Delegacia"
         "Setor de TI"          -> "Setor de TI"   (misturado: respeita)
 
-    O split() de quebra também limpa espaços repetidos, de graça.
+    A primeira linha tira os espaços das pontas e junta os repetidos: o
+    split() sem argumento separa em qualquer quantidade de espaço, e o
+    join() cola de volta com um espaço só.
     """
-    texto = texto.strip()
+    texto = " ".join(texto.split())
     if ja_formatado(texto):
         return texto
 
@@ -64,8 +79,9 @@ def frase(texto):
     """
     Para descrição: só a primeira letra em maiúscula, o resto como veio.
 
-        "porta RDP exposta"    -> "Porta RDP exposta"
-        "PORTA RDP EXPOSTA"    -> "Porta rdp exposta"
+        "porta RDP exposta"       -> "Porta RDP exposta"
+        "PORTA RDP EXPOSTA"       -> "Porta rdp exposta"
+        "iDRAC com senha padrão"  -> "iDRAC com senha padrão"
 
     Descrição é frase, não nome próprio. Se eu usasse titulo() aqui, sairia
     "Porta Rdp Exposta" - e o acrônimo estaria destruído.
@@ -74,28 +90,38 @@ def frase(texto):
     SIGI, TI. A exceção é o texto todo em caixa alta, que precisa ser
     rebaixado: ali não há como distinguir "RDP" de "PORTA", então o acrônimo
     se perde. É o preço de digitar com Caps Lock ligado.
+
+    E a primeira letra só sobe se a primeira palavra estiver toda em
+    minúscula. "iDRAC" e "pfSense" já vêm com a maiúscula no lugar certo;
+    subindo a primeira letra, virariam "IDRAC" e "PfSense".
     """
-    texto = texto.strip()
+    texto = " ".join(texto.split())
     if not texto:
         return texto
-    if texto.isupper():
+    if _sem_ordinais(texto).isupper():
         texto = texto.lower()
-    return texto[0].upper() + texto[1:]
+    if texto.split()[0].islower():
+        texto = texto[0].upper() + texto[1:]
+    return texto
 
 
 if __name__ == "__main__":
     casos_titulo = [
-        ("escrivão de plantão", "Escrivão de Plantão"),
-        ("ESCRIVÃO DE PLANTÃO", "Escrivão de Plantão"),
-        ("Setor de TI",         "Setor de TI"),
-        ("sala   de  máquinas", "Sala de Máquinas"),
-        ("cartório",            "Cartório"),
+        ("escrivão de plantão",   "Escrivão de Plantão"),
+        ("ESCRIVÃO DE PLANTÃO",   "Escrivão de Plantão"),
+        ("Setor de TI",           "Setor de TI"),
+        ("sala   de  máquinas",   "Sala de Máquinas"),
+        ("cartório",              "Cartório"),
+        ("1ª DELEGACIA REGIONAL", "1ª Delegacia Regional"),
+        ("Setor  de  TI",         "Setor de TI"),
     ]
     casos_frase = [
-        ("porta RDP exposta",      "Porta RDP exposta"),
-        ("PORTA RDP EXPOSTA",      "Porta rdp exposta"),
+        ("porta RDP exposta",       "Porta RDP exposta"),
+        ("PORTA RDP EXPOSTA",       "Porta rdp exposta"),
         ("senha padrão de fábrica", "Senha padrão de fábrica"),
-        ("Já estava certo",        "Já estava certo"),
+        ("Já estava certo",         "Já estava certo"),
+        ("iDRAC com senha padrão",  "iDRAC com senha padrão"),
+        ("pfSense desatualizado",   "pfSense desatualizado"),
     ]
 
     print("--- titulo() ---")

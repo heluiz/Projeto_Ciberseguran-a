@@ -3,8 +3,9 @@ falhas.py
 ---------
 Operações sobre as vulnerabilidades associadas aos equipamentos.
 
-Mesma regra do equipamentos.py: nenhum input(), nenhum print(), nenhuma
-gravação em disco. Recebe dados, mexe no dicionário, devolve resultado.
+Mesma regra do equipamentos.py: nenhum input(), print() só no bloco de
+teste, nenhuma gravação em disco. Recebe dados, mexe no dicionário, devolve
+resultado.
 
 Atende aos requisitos 7 e 8, e à parte de cascata do requisito 6.
 """
@@ -83,7 +84,7 @@ def atualizar(falhas, id_falha, alteracoes):
     """
     'alteracoes' é um dicionário {campo: novo_valor}. Só os campos presentes
     mudam; o resto fica como estava. Devolve True se atualizou, False se o id
-    não existe, e levanta ValueError num campo protegido.
+    não existe, e levanta ValueError num campo protegido - aí nada muda.
 
     Mesma forma da atualização de equipamentos, de propósito: duas telas que
     fazem a mesma coisa devem funcionar do mesmo jeito.
@@ -98,9 +99,13 @@ def atualizar(falhas, id_falha, alteracoes):
     if registro is None:
         return False
 
-    for campo, valor in alteracoes.items():
+    # Primeiro confiro, depois aplico - o mesmo tudo ou nada da atualização
+    # de equipamentos.
+    for campo in alteracoes:
         if campo not in CAMPOS_EDITAVEIS:
             raise ValueError(f"Campo não editável: '{campo}'")
+
+    for campo, valor in alteracoes.items():
         if campo == "descricao":
             # Mesma regra de frase do cadastro: só a primeira letra em
             # maiúscula, preservando acrônimos como RDP ou CPD.
