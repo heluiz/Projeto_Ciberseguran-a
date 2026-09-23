@@ -118,18 +118,76 @@ def ler_hostname(mensagem, obrigatorio=True):
 # ===========================================================================
 # EXIBIÇÃO
 # ===========================================================================
-def coluna(texto, largura):
+def coluna(texto, largura, a_direita=False):
     """
     Encaixa o texto numa coluna de largura fixa.
 
     Sem isso, um hostname mais longo que a coluna empurra todo o resto da
     linha para a direita e a tabela perde o alinhamento. Corto em
     largura - 2 e marco com ".." para o leitor saber que foi cortado.
+
+    a_direita=True é para números: alinhados à direita, as unidades ficam
+    uma embaixo da outra, e é assim que o olho compara quantidades.
     """
     texto = str(texto)
     if len(texto) > largura:
         return texto[:largura - 2] + ".."
+    if a_direita:
+        return texto.rjust(largura)
     return texto.ljust(largura)
+
+
+def linha_da_tabela(valores, larguras, a_direita):
+    """
+    Uma linha da tabela: cada valor na sua coluna, dois espaços entre elas.
+
+    zip() anda pelas três listas ao mesmo tempo - o primeiro valor com a
+    primeira largura e o primeiro alinhamento, e assim por diante.
+    """
+    celulas = [coluna(valor, largura, direita)
+               for valor, largura, direita in zip(valores, larguras, a_direita)]
+    return "  " + "  ".join(celulas)
+
+
+def mostrar_tabela(base_falhas, itens):
+    """
+    Equipamentos em tabela, uma linha por equipamento. Serve à listagem
+    (opção 2) e às buscas com mais de um resultado.
+
+    Como decidi o formato - pesquisei guias de interface de linha de comando
+    e de desenho de tabelas, e testei com uma base de 24 equipamentos:
+
+    - Cada coluna tem a largura do maior valor DESTA lista, com um teto. É a
+      mesma ideia da coluna de ID da lista de vulnerabilidades. Com larguras
+      fixas, nomes longos saíam cortados e colunas curtas sobravam vazias.
+    - Dois espaços entre as colunas: com um só, "Setor de Informática" e
+      "Sala Técnica" grudavam e pareciam um texto só.
+    - Texto à esquerda, número à direita, e o cabeçalho acompanha a coluna.
+    - Com todos os tetos, a linha mais larga possível tem 113 caracteres -
+      cabe nas 120 colunas com que o Windows Terminal abre.
+    """
+    cabecalho = ("ID", "HOSTNAME", "CATEGORIA", "RESPONSÁVEL", "LOTAÇÃO", "VULNS")
+    tetos     = (6, 24, 22, 24, 20, 5)
+    a_direita = (True, False, False, False, False, True)
+
+    linhas = []
+    for id_equipamento, registro in itens:
+        quantas = len(falhas.listar_por_equipamento(base_falhas, id_equipamento))
+        linhas.append((str(id_equipamento), registro["hostname"],
+                       registro["categoria"].rotulo, registro["custodiante"],
+                       registro["lotacao"], str(quantas)))
+
+    # Largura de cada coluna: o maior entre o título e os valores, sem passar
+    # do teto. Acima do teto, coluna() corta e marca com "..".
+    larguras = []
+    for posicao, titulo in enumerate(cabecalho):
+        maior = max([len(titulo)] + [len(linha[posicao]) for linha in linhas])
+        larguras.append(min(maior, tetos[posicao]))
+
+    print("\n" + linha_da_tabela(cabecalho, larguras, a_direita))
+    print("  " + "-" * (sum(larguras) + 2 * (len(larguras) - 1)))
+    for linha in linhas:
+        print(linha_da_tabela(linha, larguras, a_direita))
 
 
 def mostrar_equipamento(id_equipamento, registro):
@@ -141,21 +199,28 @@ def mostrar_equipamento(id_equipamento, registro):
     print(f"  Descrição ..... {registro['descricao']}")
 
 
-def mostrar_falha(id_falha, registro):
-    """Uma vulnerabilidade sozinha, nas telas de correção e de exclusão."""
+def mostrar_falha(id_falha, registro, base_equipamentos):
+    """
+    Uma vulnerabilidade sozinha, nas telas de correção e de exclusão.
+
+    O equipamento aparece com hostname e responsável, não só pelo número,
+    para o operador confirmar que está mexendo na máquina certa. O acesso
+    direto base_equipamentos[...] é seguro: a carga recusa vulnerabilidade
+    que aponte para equipamento inexistente (integridade referencial).
+    """
+    equipamento = base_equipamentos[registro["equipamento_id"]]
     print(f"\n  ID ............ {id_falha}")
-    print(f"  Equipamento ... {registro['equipamento_id']}")
+    print(f"  Equipamento ... {registro['equipamento_id']} - "
+          f"{equipamento['hostname']} ({equipamento['custodiante']})")
     print(f"  Descrição ..... {registro['descricao']}")
     print(f"  Categoria ..... {registro['origem'].rotulo}")
     print(f"  Severidade .... {registro['gravidade'].rotulo}")
     print(f"  Situação ...... {registro['situacao'].rotulo}")
 
 
-def mostrar_falhas(base_falhas, id_equipamento):
+def imprimir_falhas(encontradas, base_equipamentos=None):
     """
-    REQUISITO 8.
-    A mensagem de "sem vulnerabilidades registradas" que o enunciado exige
-    sai exatamente aqui - este é o único módulo que fala com o usuário.
+    Imprime vulnerabilidades em duas linhas cada, na ordem em que vierem.
 
     Sobre o formato: o programa imprime texto puro, sem cor nem negrito
     disponíveis. Então a hierarquia precisa vir de ordem, posição e espaço
@@ -168,15 +233,11 @@ def mostrar_falhas(base_falhas, id_equipamento):
       problema. Antes ela ficava na segunda linha, abaixo dos metadados.
     - Situação e categoria descem para a segunda linha, como legenda.
     - A linha em branco entre os itens impede que a lista vire um bloco só.
+
+    base_equipamentos só vem no relatório de pendentes (opção 10): lá as
+    vulnerabilidades são de vários equipamentos, e a legenda precisa dizer
+    de qual é cada uma. Na ficha de um equipamento, seria repetição.
     """
-    encontradas = falhas.listar_por_equipamento(base_falhas, id_equipamento)
-
-    if not encontradas:
-        print("\n  Este equipamento está sem vulnerabilidades registradas.")
-        return
-
-    print(f"\n  Vulnerabilidades ({len(encontradas)}), da mais grave:\n")
-
     # A largura da coluna do ID vem do maior ID DESTA lista. Assim as
     # descrições ficam alinhadas entre si e a segunda linha de cada item
     # alinha com a primeira, tanto com [3] quanto com [147]. Escrever a
@@ -186,12 +247,31 @@ def mostrar_falhas(base_falhas, id_equipamento):
 
     for id_falha, registro in encontradas:
         marcador = f"[{id_falha}]"
+        legenda = f"{registro['situacao'].rotulo} \u00b7 {registro['origem'].rotulo}"
+        if base_equipamentos is not None:
+            hostname = base_equipamentos[registro["equipamento_id"]]["hostname"]
+            legenda = f"{hostname} \u00b7 {legenda}"
         # As chaves de dentro, em {marcador:<{largura_id}}, são a largura
         # calculada acima: dá para montar o formato em tempo de execução.
         print(f"    {registro['gravidade'].rotulo.upper():<9} "
               f"{marcador:<{largura_id}} {registro['descricao']}")
-        print(f"    {'':<9} {'':<{largura_id}} "
-              f"{registro['situacao'].rotulo} \u00b7 {registro['origem'].rotulo}\n")
+        print(f"    {'':<9} {'':<{largura_id}} {legenda}\n")
+
+
+def mostrar_falhas(base_falhas, id_equipamento):
+    """
+    REQUISITO 8.
+    A mensagem de "sem vulnerabilidades registradas" que o enunciado exige
+    sai exatamente aqui - este é o único módulo que fala com o usuário.
+    """
+    encontradas = falhas.listar_por_equipamento(base_falhas, id_equipamento)
+
+    if not encontradas:
+        print("\n  Este equipamento está sem vulnerabilidades registradas.")
+        return
+
+    print(f"\n  Vulnerabilidades ({len(encontradas)}), da mais grave:\n")
+    imprimir_falhas(encontradas)
 
 
 # ===========================================================================
@@ -260,49 +340,65 @@ def acao_listar_todos(base_equipamentos, base_falhas):
         print("\n  Nenhum equipamento cadastrado ainda.")
         return
 
-    # Larguras num lugar só: cabeçalho, linha de traços e linhas de dados
-    # usam os mesmos números, então não tem como um sair diferente do outro.
-    cabecalho = (f"  {coluna('ID', 4)} {coluna('HOSTNAME', 20)} "
-                 f"{coluna('CATEGORIA', 22)} {coluna('LOTAÇÃO', 16)} VULNS")
-    print("\n" + cabecalho)
-    print("  " + "-" * (len(cabecalho) - 2))
-    for id_equipamento, registro in sorted(base_equipamentos.items()):
-        quantas = len(falhas.listar_por_equipamento(base_falhas, id_equipamento))
-        print(f"  {coluna(id_equipamento, 4)} "
-              f"{coluna(registro['hostname'], 20)} "
-              f"{coluna(registro['categoria'].rotulo, 22)} "
-              f"{coluna(registro['lotacao'], 16)} {quantas}")
+    # sorted() nos pares (id, registro) ordena pelo id, o primeiro de cada par.
+    mostrar_tabela(base_falhas, sorted(base_equipamentos.items()))
+
+
+# As três buscas por texto têm a mesma mecânica - só mudam o campo e a
+# pergunta. O dicionário evita três blocos de if quase iguais (o mesmo
+# raciocínio do ACOES, lá embaixo).
+BUSCAS_POR_TEXTO = {
+    2: ("hostname",    "  Hostname (ou parte dele): "),
+    3: ("custodiante", "  Responsável (ou parte do nome): "),
+    4: ("lotacao",     "  Lotação (ou parte dela): "),
+}
 
 
 def acao_buscar(base_equipamentos, base_falhas):
-    """REQUISITO 4: por identificador OU por hostname."""
+    """
+    REQUISITO 4: por identificador ou por hostname. Além do enunciado, por
+    responsável, lotação e categoria.
+
+    Um resultado só mostra a ficha completa, com as vulnerabilidades. Vários
+    mostram a mesma tabela da listagem, que cabe numa tela.
+    """
     print("\n--- BUSCAR EQUIPAMENTO ---\n")
     print("    1 - Por ID")
     print("    2 - Por hostname")
+    print("    3 - Por responsável")
+    print("    4 - Por lotação")
+    print("    5 - Por categoria")
     opcao = ler_inteiro("  Opção: ")
 
     if opcao == 1:
         id_equipamento = ler_inteiro("  ID: ")
         registro = equipamentos.buscar_por_id(base_equipamentos, id_equipamento)
-        if registro is None:
-            print(f"\n  ! Nenhum equipamento com o ID {id_equipamento}.")
-            return
-        mostrar_equipamento(id_equipamento, registro)
-        mostrar_falhas(base_falhas, id_equipamento)
-
-    elif opcao == 2:
-        termo = ler_texto("  Hostname (ou parte dele): ")
-        encontrados = equipamentos.buscar_por_hostname(base_equipamentos, termo)
-        if not encontrados:
-            print(f"\n  ! Nenhum equipamento com '{termo}' no hostname.")
-            return
-        print(f"\n  {len(encontrados)} equipamento(s) encontrado(s):")
-        for id_equipamento, registro in encontrados:
-            mostrar_equipamento(id_equipamento, registro)
-            mostrar_falhas(base_falhas, id_equipamento)
-
+        encontrados = []
+        if registro is not None:
+            encontrados.append((id_equipamento, registro))
+    elif opcao in BUSCAS_POR_TEXTO:
+        campo, pergunta = BUSCAS_POR_TEXTO[opcao]
+        termo = ler_texto(pergunta)
+        encontrados = equipamentos.buscar_por_texto(base_equipamentos, campo, termo)
+    elif opcao == 5:
+        categoria = ler_enum("  Categoria:", CategoriaEquipamento)
+        encontrados = equipamentos.buscar_por_categoria(base_equipamentos,
+                                                        categoria)
     else:
         print("\n  ! Opção inválida.")
+        return
+
+    if not encontrados:
+        print("\n  ! Nenhum equipamento encontrado.")
+    elif len(encontrados) == 1:
+        id_equipamento, registro = encontrados[0]
+        mostrar_equipamento(id_equipamento, registro)
+        mostrar_falhas(base_falhas, id_equipamento)
+    else:
+        print(f"\n  {len(encontrados)} equipamentos encontrados:")
+        mostrar_tabela(base_falhas, encontrados)
+        print("\n  Para ver a ficha e as vulnerabilidades de um deles, "
+              "use a opção 7.")
 
 
 def acao_atualizar(base_equipamentos, base_falhas):
@@ -433,7 +529,7 @@ def acao_atualizar_falha(base_equipamentos, base_falhas):
         return
 
     registro = base_falhas[id_falha]
-    mostrar_falha(id_falha, registro)
+    mostrar_falha(id_falha, registro, base_equipamentos)
     print("\n  Deixe em branco para manter o valor atual.\n")
 
     alteracoes = {}
@@ -491,7 +587,7 @@ def acao_excluir_falha(base_equipamentos, base_falhas):
         print(f"\n  ! Nenhuma vulnerabilidade com o ID {id_falha}.")
         return
 
-    mostrar_falha(id_falha, base_falhas[id_falha])
+    mostrar_falha(id_falha, base_falhas[id_falha], base_equipamentos)
 
     print("\n  Atenção: exclua apenas cadastro errado ou duplicado.")
     print("  Se a vulnerabilidade foi resolvida, use a opção 8 e marque")
@@ -506,12 +602,33 @@ def acao_excluir_falha(base_equipamentos, base_falhas):
     print("\n  Vulnerabilidade excluída.")
 
 
+def acao_pendentes(base_equipamentos, base_falhas):
+    """
+    Relatório de pendentes (opção 10) - além do enunciado.
+
+    As vulnerabilidades que ainda pedem ação, de TODOS os equipamentos, da
+    mais grave para a menos. É a primeira pergunta de quem cuida da
+    segurança: o que corrigir agora? Sem este relatório, a resposta exigiria
+    abrir a ficha de cada equipamento, um por um.
+    """
+    print("\n--- VULNERABILIDADES PENDENTES ---")
+    pendentes = falhas.listar_pendentes(base_falhas)
+
+    if not pendentes:
+        print("\n  Nenhuma vulnerabilidade aberta ou em tratamento.")
+        return
+
+    print(f"\n  {len(pendentes)} aberta(s) ou em tratamento, da mais grave:\n")
+    imprimir_falhas(pendentes, base_equipamentos)
+
+
 # ===========================================================================
 # O MENU
 #
 # Uso um DICIONÁRIO para ligar o número digitado à função correspondente,
 # em vez de uma sequência de if/elif. Vantagens: acrescentar uma opção nova
-# é uma linha só, e não existe risco de esquecer um elif no meio da cadeia.
+# é uma linha só (foi assim que a 10 entrou), e não existe risco de esquecer
+# um elif no meio da cadeia.
 #
 # É, de quebra, um segundo uso de dicionário no projeto (requisito 9) - aqui
 # não para guardar dados, mas para escolher comportamento.
@@ -526,21 +643,25 @@ ACOES = {
     7: acao_ver_falhas,
     8: acao_atualizar_falha,
     9: acao_excluir_falha,
+    10: acao_pendentes,
 }
 
 
 def exibir_menu():
+    # Números alinhados à direita, como em qualquer coluna de números: com a
+    # opção 10, o traço continua na mesma posição em todas as linhas.
     print("\n" + "=" * 62)
-    print("  1 - Cadastrar equipamento")
-    print("  2 - Listar todos os equipamentos")
-    print("  3 - Buscar equipamento (por ID ou hostname)")
-    print("  4 - Atualizar equipamento")
-    print("  5 - Excluir equipamento (e suas vulnerabilidades)")
-    print("  6 - Cadastrar vulnerabilidade")
-    print("  7 - Ver vulnerabilidades de um equipamento")
-    print("  8 - Atualizar vulnerabilidade")
-    print("  9 - Excluir vulnerabilidade")
-    print("  0 - Sair")
+    print("   1 - Cadastrar equipamento")
+    print("   2 - Listar todos os equipamentos")
+    print("   3 - Buscar equipamento (por ID, hostname, responsável...)")
+    print("   4 - Atualizar equipamento")
+    print("   5 - Excluir equipamento (e suas vulnerabilidades)")
+    print("   6 - Cadastrar vulnerabilidade")
+    print("   7 - Ver vulnerabilidades de um equipamento")
+    print("   8 - Atualizar vulnerabilidade")
+    print("   9 - Excluir vulnerabilidade")
+    print("  10 - Vulnerabilidades pendentes (todas, da mais grave)")
+    print("   0 - Sair")
     print("=" * 62)
 
 

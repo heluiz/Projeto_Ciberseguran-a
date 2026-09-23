@@ -152,7 +152,9 @@ def cadastrar(equipamentos, hostname, custodiante, lotacao, descricao, categoria
 
 
 # ===========================================================================
-# REQUISITO 4 - busca por identificador OU por hostname
+# REQUISITO 4 - busca por identificador OU por hostname. Além do enunciado,
+# também por responsável, lotação e categoria: na prática, o operador lembra
+# mais de quem usa a máquina e de onde ela fica do que do nome dela.
 # ===========================================================================
 def buscar_por_id(equipamentos, id_equipamento):
     """
@@ -169,23 +171,47 @@ def buscar_por_id(equipamentos, id_equipamento):
     return equipamentos.get(id_equipamento)
 
 
-def buscar_por_hostname(equipamentos, termo):
-    """
-    Devolve uma LISTA de pares (id, registro).
+# Campos que aceitam busca por texto. Categoria fica de fora de propósito:
+# ela é um Enum e se escolhe numa lista - ver buscar_por_categoria().
+CAMPOS_DE_BUSCA = ("hostname", "custodiante", "lotacao")
 
-    Por que lista, e não um resultado só? Porque a busca é parcial e ignora
-    maiúsculas: digitar "cart" encontra "PC-CARTORIO-01". Isso pode casar com
-    vários equipamentos, e na prática ninguém lembra o hostname inteiro.
+
+def buscar_por_texto(equipamentos, campo, termo):
+    """
+    Devolve uma LISTA de pares (id, registro) cujo campo contém o termo.
+
+    Serve ao hostname (requisito 4), ao responsável e à lotação. A busca é
+    parcial e não diferencia maiúscula nem acento: "cart" encontra
+    "PC-CARTORIO-01", e "plantao" encontra "Plantão". Isso pode casar com
+    vários equipamentos - por isso uma lista, e não um resultado só.
+
+    Os dois lados passam pela mesma limpeza, o formatacao.para_busca(): o
+    termo digitado e o valor gravado. Só assim a comparação é justa.
 
     Esta busca percorre o dicionário inteiro, ao contrário da busca por id.
     É o preço de procurar por um campo que não é a chave.
     """
-    termo = termo.strip().lower()
+    if campo not in CAMPOS_DE_BUSCA:
+        raise ValueError(f"Campo sem busca por texto: '{campo}'")
+    alvo = formatacao.para_busca(termo)
     encontrados = []
-    for id_equipamento, registro in equipamentos.items():
-        if termo in registro["hostname"].lower():
+    # sorted() nos pares (id, registro) ordena pelo id, o primeiro de cada par.
+    for id_equipamento, registro in sorted(equipamentos.items()):
+        if alvo in formatacao.para_busca(registro[campo]):
             encontrados.append((id_equipamento, registro))
     return encontrados
+
+
+def buscar_por_categoria(equipamentos, categoria):
+    """
+    Devolve os pares (id, registro) de uma categoria, em ordem de id.
+
+    Aqui a comparação é exata, sem para_busca(): a categoria é um membro do
+    Enum, escolhido numa lista - não um texto digitado.
+    """
+    return [(id_equipamento, registro)
+            for id_equipamento, registro in sorted(equipamentos.items())
+            if registro["categoria"] == categoria]
 
 
 # ===========================================================================
@@ -285,9 +311,17 @@ if __name__ == "__main__":
     print(f"\nBusca por id 2: {buscar_por_id(equipamentos, 2)['hostname']}")
     print(f"Busca por id 99: {buscar_por_id(equipamentos, 99)}  (None = não existe)")
 
-    print("\nBusca parcial por 'cart':")
-    for id_equipamento, registro in buscar_por_hostname(equipamentos, "cart"):
+    print("\nBusca parcial por 'cart' no hostname:")
+    for id_equipamento, registro in buscar_por_texto(equipamentos, "hostname", "cart"):
         print(f"  {id_equipamento} - {registro['hostname']}")
+
+    # Sem acento e em minúscula, encontra "Escrivão de plantão".
+    achados = [i for i, _ in buscar_por_texto(equipamentos, "custodiante", "escrivao")]
+    print(f"Busca 'escrivao' no responsável: ids {achados}")
+    assert achados == [1], "a busca sem acento falhou"
+
+    servidores = buscar_por_categoria(equipamentos, CategoriaEquipamento.SERVIDOR)
+    print(f"Busca pela categoria Servidor: ids {[i for i, _ in servidores]}")
 
     # --- Requisito 5 ---
     atualizar(equipamentos, 1, {"custodiante": "Investigador de plantão"})
