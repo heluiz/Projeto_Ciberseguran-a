@@ -1,61 +1,69 @@
-"""
-main.py
--------
-O programa em si: menu, leitura do que o usuário digita e tratamento de erros.
+"""Programa principal: menu, leitura do teclado e exibição.
 
-Este é o único arquivo que conversa com o usuário. Nos outros não há
-input(), e print() só aparece no bloco de teste de cada um - é o que
-permitiu testar cada um isoladamente.
-
-Aqui também moram as regras que envolvem MAIS DE UM módulo, como a exclusão
-em cascata: nem equipamentos.py nem falhas.py enxergam os dados um do outro,
-então quem coordena os dois é este arquivo.
-
-Atende ao requisito 1 e junta todos os demais.
+Único módulo que conversa com o usuário. Também coordena as regras que
+envolvem mais de um módulo, como a exclusão em cascata. Atende ao
+requisito 1 e integra os demais.
 """
 
 import arquivo
-import equipamentos
+import ativos
 import falhas
 from classificacoes import (
-    CategoriaEquipamento,
+    CategoriaAtivo,
     OrigemFalha,
     NivelGravidade,
     SituacaoTratamento,
 )
 
-
-# Nota sobre os nomes:
-# o MÓDULO se chama 'equipamentos' e o DICIONÁRIO com os dados se chama
-# 'base_equipamentos'. Se os dois tivessem o mesmo nome, um sobrescreveria o
-# outro e nada funcionaria. Essa distinção deixa cada chamada explícita:
-# equipamentos.cadastrar(base_equipamentos, ...) lê-se como "o módulo
-# equipamentos, operação cadastrar, sobre a base de equipamentos".
+# Os dicionários de dados se chamam base_ativos e base_falhas para não
+# ocultarem os módulos ativos e falhas.
 
 
-# ===========================================================================
-# LEITURA COM TRATAMENTO DE ERROS - o coração do REQUISITO 1
-#
-# O enunciado manda evitar falhas por "comandos inválidos, campos vazios ou
-# tipos de dados incorretos". Cada uma dessas três coisas tem uma função
-# abaixo. Centralizar aqui significa que eu trato o erro UMA vez e todas as
-# telas do programa ganham isso de graça.
-# ===========================================================================
 def ler_texto(mensagem, obrigatorio=True):
-    """Campos vazios: repete a pergunta até vir algo escrito."""
+    """Lê um texto; se obrigatório, repete a pergunta até vir algo.
+
+    Recusa caracteres de controle, como ESC: gravados, eles alterariam
+    o terminal toda vez que o texto fosse exibido.
+    """
     while True:
         valor = input(mensagem).strip()
-        if valor or not obrigatorio:
+        if not valor.isprintable():
+            print("  ! Use apenas caracteres visíveis.")
+        elif valor or not obrigatorio:
             return valor
-        print("  ! Este campo não pode ficar vazio.")
+        else:
+            print("  ! Este campo não pode ficar vazio.")
+
+
+# Texto mais curto que isto pede confirmação: "TI" pode ser um setor,
+# mas "a" costuma ser engano de digitação.
+MINIMO_SEM_CONFIRMAR = 3
+
+
+def ler_campo(mensagem, obrigatorio=True):
+    """Lê responsável, lotação ou descrição.
+
+    Recusa texto sem nenhuma letra ("12") e pede confirmação para texto
+    curto ("TI"). Com obrigatorio=False, Enter vazio devolve "" (manter
+    o valor atual).
+    """
+    while True:
+        valor = ler_texto(mensagem, obrigatorio)
+        if not valor:
+            return valor
+        if not any(c.isalpha() for c in valor):
+            print("  ! Use pelo menos uma letra.")
+            continue
+        pergunta = f'  "{valor}" ficou curto. É isso mesmo?'
+        if len(valor) < MINIMO_SEM_CONFIRMAR and not confirmar(pergunta):
+            continue
+        return valor
 
 
 def ler_inteiro(mensagem, opcional=False):
-    """
-    Tipos incorretos: repete até o usuário digitar um número de verdade.
+    """Lê um número inteiro, repetindo a pergunta até vir um válido.
 
-    opcional=True aceita Enter vazio e devolve None. Uso isso na atualização,
-    onde Enter significa "não quero mudar este campo".
+    Com opcional=True, Enter vazio devolve None (manter o valor atual).
     """
     while True:
         bruto = input(mensagem).strip()
@@ -64,16 +72,13 @@ def ler_inteiro(mensagem, opcional=False):
         try:
             return int(bruto)
         except ValueError:
-            # int() levanta ValueError quando o texto não é número.
-            # Capturo aqui em vez de deixar o programa quebrar na cara do
-            # usuário.
             print("  ! Digite apenas números.")
 
 
 def ler_enum(mensagem, classe_enum, opcional=False):
-    """
-    Comandos inválidos: mostra as opções e só aceita um código da lista.
-    Quem valida é o próprio Enum - código inexistente levanta ValueError.
+    """Mostra as opções do Enum e só aceita um código da lista.
+
+    Com opcional=True, Enter vazio devolve None.
     """
     print(f"\n{mensagem}")
     for item in classe_enum:
@@ -90,44 +95,34 @@ def ler_enum(mensagem, classe_enum, opcional=False):
 
 
 def confirmar(mensagem):
-    """Só devolve True se o usuário digitar 's'. Qualquer outra coisa é não."""
-    return input(f"{mensagem} (s/N): ").strip().lower() == "s"
+    """Devolve True se o usuário responder 's' ou 'sim'."""
+    return input(f"{mensagem} (s/N): ").strip().lower() in ("s", "sim")
 
 
-def ler_hostname(mensagem, obrigatorio=True):
-    """
-    Lê um hostname e só aceita um nome válido na rede.
+def ler_hostname(mensagem, base_ativos, ignorar_id=None,
+                 obrigatorio=True):
+    """Lê um hostname e repete a pergunta até vir um nome válido.
 
-    A regra não mora aqui: pergunto ao equipamentos.py, que é o dono dela.
-    Assim o formato é recusado na hora em que o operador digita, e não
-    depois de ele preencher os outros quatro campos.
-
-    Vazio é aceito quando obrigatorio=False: na atualização, Enter
-    significa "manter o atual".
+    A regra, inclusive a de nome repetido, fica em
+    ativos.problema_no_hostname(). Vazio só é aceito com
+    obrigatorio=False (na atualização, manter o atual).
     """
     while True:
         valor = ler_texto(mensagem, obrigatorio)
         if not valor:
             return valor
-        problema = equipamentos.problema_no_hostname(valor)
+        problema = ativos.problema_no_hostname(valor, base_ativos,
+                                               ignorar_id)
         if problema is None:
             return valor
         print(f"  ! Hostname inválido: {problema}.")
 
 
-# ===========================================================================
-# EXIBIÇÃO
-# ===========================================================================
 def coluna(texto, largura, a_direita=False):
-    """
-    Encaixa o texto numa coluna de largura fixa.
+    """Encaixa o texto numa coluna de largura fixa.
 
-    Sem isso, um hostname mais longo que a coluna empurra todo o resto da
-    linha para a direita e a tabela perde o alinhamento. Corto em
-    largura - 2 e marco com ".." para o leitor saber que foi cortado.
-
-    a_direita=True é para números: alinhados à direita, as unidades ficam
-    uma embaixo da outra, e é assim que o olho compara quantidades.
+    Texto longo é cortado e marcado com "..". Números vão à direita
+    (a_direita=True), para as unidades ficarem alinhadas.
     """
     texto = str(texto)
     if len(texto) > largura:
@@ -138,47 +133,33 @@ def coluna(texto, largura, a_direita=False):
 
 
 def linha_da_tabela(valores, larguras, a_direita):
-    """
-    Uma linha da tabela: cada valor na sua coluna, dois espaços entre elas.
-
-    zip() anda pelas três sequências ao mesmo tempo - o primeiro valor com a
-    primeira largura e o primeiro alinhamento, e assim por diante.
-    """
+    """Monta uma linha da tabela, com dois espaços entre as colunas."""
     celulas = [coluna(valor, largura, direita)
-               for valor, largura, direita in zip(valores, larguras, a_direita)]
+               for valor, largura, direita
+               in zip(valores, larguras, a_direita)]
     return "  " + "  ".join(celulas)
 
 
 def mostrar_tabela(base_falhas, itens):
-    """
-    Equipamentos em tabela, uma linha por equipamento. Serve à listagem
-    (opção 2) e às buscas com mais de um resultado.
+    """Mostra ativos em tabela, uma linha por ativo.
 
-    Como decidi o formato - pesquisei guias de interface de linha de comando
-    e de desenho de tabelas, e testei com uma base de 24 equipamentos:
-
-    - Cada coluna tem a largura do maior valor DESTA lista, com um teto. É a
-      mesma ideia da coluna de ID da lista de vulnerabilidades. Com larguras
-      fixas, nomes longos saíam cortados e colunas curtas sobravam vazias.
-    - Dois espaços entre as colunas: com um só, "Setor de Informática" e
-      "Sala Técnica" grudavam e pareciam um texto só.
-    - Texto à esquerda, número à direita, e o cabeçalho acompanha a coluna.
-    - Com todos os tetos, a linha mais larga possível tem 113 caracteres -
-      cabe nas 120 colunas com que o Windows Terminal abre.
+    Cada coluna tem a largura do maior valor da lista, até um teto. Com
+    todos os tetos, a linha mais larga tem 113 caracteres e cabe nas
+    120 colunas do Windows Terminal.
     """
-    cabecalho = ("ID", "HOSTNAME", "CATEGORIA", "RESPONSÁVEL", "LOTAÇÃO", "VULNS")
-    tetos     = (6, 24, 22, 24, 20, 5)
+    cabecalho = ("ID", "HOSTNAME", "CATEGORIA", "RESPONSÁVEL", "LOTAÇÃO",
+                 "VULNS")
+    tetos = (6, 24, 22, 24, 20, 5)
     a_direita = (True, False, False, False, False, True)
 
     linhas = []
-    for id_equipamento, registro in itens:
-        quantas = len(falhas.listar_por_equipamento(base_falhas, id_equipamento))
-        linhas.append((str(id_equipamento), registro["hostname"],
+    for id_ativo, registro in itens:
+        quantas = len(falhas.listar_por_ativo(base_falhas, id_ativo))
+        linhas.append((str(id_ativo), registro["hostname"],
                        registro["categoria"].rotulo, registro["custodiante"],
                        registro["lotacao"], str(quantas)))
 
-    # Largura de cada coluna: o maior entre o título e os valores, sem passar
-    # do teto. Acima do teto, coluna() corta e marca com "..".
+    # Largura: o maior entre o título e os valores, limitada ao teto.
     larguras = []
     for posicao, titulo in enumerate(cabecalho):
         maior = max([len(titulo)] + [len(linha[posicao]) for linha in linhas])
@@ -190,8 +171,9 @@ def mostrar_tabela(base_falhas, itens):
         print(linha_da_tabela(linha, larguras, a_direita))
 
 
-def mostrar_equipamento(id_equipamento, registro):
-    print(f"\n  ID ............ {id_equipamento}")
+def mostrar_ativo(id_ativo, registro):
+    """Mostra a ficha de um ativo."""
+    print(f"\n  ID ............ {id_ativo}")
     print(f"  Hostname ...... {registro['hostname']}")
     print(f"  Custodiante ... {registro['custodiante']}")
     print(f"  Lotação ....... {registro['lotacao']}")
@@ -199,170 +181,123 @@ def mostrar_equipamento(id_equipamento, registro):
     print(f"  Descrição ..... {registro['descricao']}")
 
 
-def mostrar_falha(id_falha, registro, base_equipamentos):
-    """
-    Uma vulnerabilidade sozinha, nas telas de correção e de exclusão.
+def mostrar_falha(id_falha, registro, base_ativos):
+    """Mostra uma falha, com hostname e responsável do ativo.
 
-    O equipamento aparece com hostname e responsável, não só pelo número,
-    para o operador confirmar que está mexendo na máquina certa. O acesso
-    direto base_equipamentos[...] é seguro: a carga recusa vulnerabilidade
-    que aponte para equipamento inexistente (integridade referencial).
+    O acesso direto base_ativos[...] é seguro: a carga recusa falha que
+    aponte para ativo inexistente.
     """
-    equipamento = base_equipamentos[registro["equipamento_id"]]
+    ativo = base_ativos[registro["ativo_id"]]
     print(f"\n  ID ............ {id_falha}")
-    print(f"  Equipamento ... {registro['equipamento_id']} - "
-          f"{equipamento['hostname']} ({equipamento['custodiante']})")
+    print(f"  Ativo ......... {registro['ativo_id']} - "
+          f"{ativo['hostname']} ({ativo['custodiante']})")
     print(f"  Descrição ..... {registro['descricao']}")
     print(f"  Categoria ..... {registro['origem'].rotulo}")
     print(f"  Severidade .... {registro['gravidade'].rotulo}")
     print(f"  Situação ...... {registro['situacao'].rotulo}")
 
 
-def imprimir_falhas(encontradas, base_equipamentos=None):
+def imprimir_falhas(encontradas, base_ativos=None):
+    """Imprime falhas em duas linhas cada, na ordem recebida.
+
+    Primeira linha: severidade em coluna fixa, id e descrição. Segunda:
+    situação e categoria. Com base_ativos (relatório de pendentes), a
+    segunda linha começa pelo hostname do ativo.
     """
-    Imprime vulnerabilidades em duas linhas cada, na ordem em que vierem.
-
-    Sobre o formato: o programa imprime texto puro, sem cor nem negrito
-    disponíveis. Então a hierarquia precisa vir de ordem, posição e espaço
-    em branco. Foi assim que decidi:
-
-    - A severidade fica numa coluna fixa à esquerda, porque num inventário
-      de segurança a pergunta é "o que é crítico aqui?". De quebra, deixa
-      visível na tela a ordenação por gravidade que o falhas.py já faz.
-    - A descrição vem logo em seguida, porque é ela que diz qual é o
-      problema. Antes ela ficava na segunda linha, abaixo dos metadados.
-    - Situação e categoria descem para a segunda linha, como legenda.
-    - A linha em branco entre os itens impede que a lista vire um bloco só.
-
-    base_equipamentos só vem no relatório de pendentes (opção 10): lá as
-    vulnerabilidades são de vários equipamentos, e a legenda precisa dizer
-    de qual é cada uma. Na ficha de um equipamento, seria repetição.
-    """
-    # A largura da coluna do ID vem do maior ID DESTA lista. Assim as
-    # descrições ficam alinhadas entre si e a segunda linha de cada item
-    # alinha com a primeira, tanto com [3] quanto com [147]. Escrever a
-    # largura na mão daria certo hoje e quebraria no dia em que a base
-    # passasse de 9 vulnerabilidades.
+    # Largura do id tirada da própria lista, para alinhar [3] e [147].
     largura_id = max(len(f"[{id_falha}]") for id_falha, _ in encontradas)
 
     for id_falha, registro in encontradas:
         marcador = f"[{id_falha}]"
-        legenda = f"{registro['situacao'].rotulo} \u00b7 {registro['origem'].rotulo}"
-        if base_equipamentos is not None:
-            hostname = base_equipamentos[registro["equipamento_id"]]["hostname"]
-            legenda = f"{hostname} \u00b7 {legenda}"
-        # As chaves de dentro, em {marcador:<{largura_id}}, são a largura
-        # calculada acima: dá para montar o formato em tempo de execução.
+        legenda = (f"{registro['situacao'].rotulo} · "
+                   f"{registro['origem'].rotulo}")
+        if base_ativos is not None:
+            hostname = base_ativos[registro["ativo_id"]]["hostname"]
+            legenda = f"{hostname} · {legenda}"
         print(f"    {registro['gravidade'].rotulo.upper():<9} "
               f"{marcador:<{largura_id}} {registro['descricao']}")
         print(f"    {'':<9} {'':<{largura_id}} {legenda}\n")
 
 
-def mostrar_falhas(base_falhas, id_equipamento):
-    """
-    REQUISITO 8.
-    A mensagem de "sem vulnerabilidades registradas" que o enunciado exige
-    sai exatamente aqui - este é o único módulo que fala com o usuário.
-    """
-    encontradas = falhas.listar_por_equipamento(base_falhas, id_equipamento)
+def mostrar_falhas(base_falhas, id_ativo):
+    """Mostra as falhas do ativo (requisito 8)."""
+    encontradas = falhas.listar_por_ativo(base_falhas, id_ativo)
 
     if not encontradas:
-        print("\n  Este equipamento está sem vulnerabilidades registradas.")
+        print("\n  Este ativo está sem vulnerabilidades registradas.")
         return
 
     print(f"\n  Vulnerabilidades ({len(encontradas)}), da mais grave:\n")
     imprimir_falhas(encontradas)
 
 
-# ===========================================================================
-# AÇÕES DO MENU
-# ===========================================================================
-def cadastrar_falha_para(base_equipamentos, base_falhas, id_equipamento):
-    """
-    Pergunta os quatro campos de uma vulnerabilidade, registra e grava.
+def cadastrar_falha_para(base_ativos, base_falhas, id_ativo):
+    """Pergunta os campos de uma vulnerabilidade, registra e grava.
 
-    Esta função é usada em DOIS lugares: no cadastro do equipamento
-    (requisito 3, "lista inicial de vulnerabilidades") e na opção de menu
-    própria (requisito 7, "a qualquer momento após o cadastro"). Escrevê-la
-    uma vez só evita que as duas telas se comportem de forma diferente.
+    Usada no cadastro do ativo (requisito 3) e na opção 6 (requisito
+    7), para as duas telas se comportarem igual.
     """
-    descricao = ler_texto("  Descrição da vulnerabilidade: ")
+    descricao = ler_campo("  Descrição da vulnerabilidade: ")
     origem = ler_enum("  Categoria da vulnerabilidade:", OrigemFalha)
     gravidade = ler_enum("  Severidade:", NivelGravidade)
     situacao = ler_enum("  Status do tratamento:", SituacaoTratamento)
 
-    id_falha = falhas.cadastrar(base_falhas, id_equipamento, descricao,
+    id_falha = falhas.cadastrar(base_falhas, id_ativo, descricao,
                                 origem, gravidade, situacao)
-    # Grava ANTES de confirmar: a mensagem de sucesso só aparece quando o
-    # dado já está no disco.
-    arquivo.salvar(base_equipamentos, base_falhas)
+    arquivo.salvar(base_ativos, base_falhas)
     print(f"\n  Vulnerabilidade {id_falha} registrada.")
 
 
-def acao_cadastrar_equipamento(base_equipamentos, base_falhas):
-    """REQUISITO 3."""
-    print("\n--- CADASTRAR EQUIPAMENTO ---\n")
-    hostname    = ler_hostname("  Hostname: ")
-    custodiante = ler_texto("  Custodiante (responsável): ")
-    lotacao     = ler_texto("  Lotação (setor): ")
-    descricao   = ler_texto("  Descrição: ")
-    categoria   = ler_enum("  Tipo de equipamento:", CategoriaEquipamento)
+def acao_cadastrar_ativo(base_ativos, base_falhas):
+    """Opção 1: cadastra um ativo e as falhas iniciais (requisito 3)."""
+    print("\n--- CADASTRAR ATIVO ---\n")
+    hostname = ler_hostname("  Hostname: ", base_ativos)
+    custodiante = ler_campo("  Custodiante (responsável): ")
+    lotacao = ler_campo("  Lotação (setor): ")
+    descricao = ler_campo("  Descrição: ")
+    categoria = ler_enum("  Tipo de ativo:", CategoriaAtivo)
 
     try:
-        id_novo = equipamentos.cadastrar(base_equipamentos, hostname,
-                                         custodiante, lotacao, descricao,
-                                         categoria)
+        id_novo = ativos.cadastrar(base_ativos, hostname, custodiante,
+                                   lotacao, descricao, categoria)
     except ValueError as erro:
-        # Hostname duplicado. O módulo recusa, o menu explica.
         print(f"\n  ! {erro}")
         return
 
-    # Grava ANTES de confirmar. Antes, a gravação só acontecia depois do laço
-    # de vulnerabilidades: se o usuário saísse no meio dele, via "cadastrado"
-    # na tela e o equipamento se perdia. Agora a regra vale para as seis
-    # ações que alteram dados - nenhuma confirma o que ainda não gravou.
-    arquivo.salvar(base_equipamentos, base_falhas)
-    print(f"\n  Equipamento cadastrado com o ID {id_novo}.")
+    arquivo.salvar(base_ativos, base_falhas)
+    print(f"\n  Ativo cadastrado com o ID {id_novo}.")
 
-    # Fim do requisito 3: "...e lista inicial de vulnerabilidades associadas,
-    # quando houver". O laço abaixo é essa parte - logo após criar o
-    # equipamento, ofereço cadastrar vulnerabilidades, quantas quiser.
-    while confirmar("\n  Cadastrar uma vulnerabilidade para este equipamento?"):
-        cadastrar_falha_para(base_equipamentos, base_falhas, id_novo)
+    # A lista inicial de vulnerabilidades do requisito 3.
+    while confirmar("\n  Cadastrar uma vulnerabilidade para este ativo?"):
+        cadastrar_falha_para(base_ativos, base_falhas, id_novo)
 
 
-def acao_listar_todos(base_equipamentos, base_falhas):
-    """Visão geral. Não é exigida pelo enunciado, mas sem ela o usuário
-    teria que decorar os IDs para usar qualquer outra opção."""
-    print("\n--- EQUIPAMENTOS CADASTRADOS ---")
+def acao_listar_todos(base_ativos, base_falhas):
+    """Opção 2: mostra todos os ativos em tabela."""
+    print("\n--- ATIVOS CADASTRADOS ---")
 
-    if not base_equipamentos:
-        print("\n  Nenhum equipamento cadastrado ainda.")
+    if not base_ativos:
+        print("\n  Nenhum ativo cadastrado ainda.")
         return
 
-    # sorted() nos pares (id, registro) ordena pelo id, o primeiro de cada par.
-    mostrar_tabela(base_falhas, sorted(base_equipamentos.items()))
+    mostrar_tabela(base_falhas, sorted(base_ativos.items()))
 
 
-# As três buscas por texto têm a mesma mecânica - só mudam o campo e a
-# pergunta. O dicionário evita três blocos de if quase iguais (o mesmo
-# raciocínio do ACOES, lá embaixo).
+# Buscas por texto da opção 3: número da opção -> (campo, pergunta).
 BUSCAS_POR_TEXTO = {
-    2: ("hostname",    "  Hostname (ou parte dele): "),
+    2: ("hostname", "  Hostname (ou parte dele): "),
     3: ("custodiante", "  Responsável (ou parte do nome): "),
-    4: ("lotacao",     "  Lotação (ou parte dela): "),
+    4: ("lotacao", "  Lotação (ou parte dela): "),
 }
 
 
-def acao_buscar(base_equipamentos, base_falhas):
-    """
-    REQUISITO 4: por identificador ou por hostname. Além do enunciado, por
-    responsável, lotação e categoria.
+def acao_buscar(base_ativos, base_falhas):
+    """Opção 3: busca ativos por id, hostname ou outros campos.
 
-    Um resultado só mostra a ficha completa, com as vulnerabilidades. Vários
-    mostram a mesma tabela da listagem, que cabe numa tela.
+    O requisito 4 pede id e hostname; responsável, lotação e categoria
+    vão além. Um resultado mostra a ficha completa; vários, a tabela.
     """
-    print("\n--- BUSCAR EQUIPAMENTO ---\n")
+    print("\n--- BUSCAR ATIVO ---\n")
     print("    1 - Por ID")
     print("    2 - Por hostname")
     print("    3 - Por responsável")
@@ -371,74 +306,78 @@ def acao_buscar(base_equipamentos, base_falhas):
     opcao = ler_inteiro("  Opção: ")
 
     if opcao == 1:
-        id_equipamento = ler_inteiro("  ID: ")
-        registro = equipamentos.buscar_por_id(base_equipamentos, id_equipamento)
+        id_ativo = ler_inteiro("  ID: ")
+        registro = ativos.buscar_por_id(base_ativos, id_ativo)
         encontrados = []
         if registro is not None:
-            encontrados.append((id_equipamento, registro))
+            encontrados.append((id_ativo, registro))
     elif opcao in BUSCAS_POR_TEXTO:
         campo, pergunta = BUSCAS_POR_TEXTO[opcao]
         termo = ler_texto(pergunta)
-        encontrados = equipamentos.buscar_por_texto(base_equipamentos, campo, termo)
+        encontrados = ativos.buscar_por_texto(base_ativos, campo, termo)
     elif opcao == 5:
-        categoria = ler_enum("  Categoria:", CategoriaEquipamento)
-        encontrados = equipamentos.buscar_por_categoria(base_equipamentos,
-                                                        categoria)
+        categoria = ler_enum("  Categoria:", CategoriaAtivo)
+        encontrados = ativos.buscar_por_categoria(base_ativos, categoria)
     else:
         print("\n  ! Opção inválida.")
         return
 
     if not encontrados:
-        print("\n  ! Nenhum equipamento encontrado.")
+        print("\n  ! Nenhum ativo encontrado.")
     elif len(encontrados) == 1:
-        id_equipamento, registro = encontrados[0]
-        mostrar_equipamento(id_equipamento, registro)
-        mostrar_falhas(base_falhas, id_equipamento)
+        id_ativo, registro = encontrados[0]
+        mostrar_ativo(id_ativo, registro)
+        mostrar_falhas(base_falhas, id_ativo)
     else:
-        print(f"\n  {len(encontrados)} equipamentos encontrados:")
+        print(f"\n  {len(encontrados)} ativos encontrados:")
         mostrar_tabela(base_falhas, encontrados)
         print("\n  Para ver a ficha e as vulnerabilidades de um deles, "
               "use a opção 7.")
 
 
-def acao_atualizar(base_equipamentos, base_falhas):
-    """REQUISITO 5."""
-    print("\n--- ATUALIZAR EQUIPAMENTO ---\n")
-    id_equipamento = ler_inteiro("  ID do equipamento: ")
-    registro = equipamentos.buscar_por_id(base_equipamentos, id_equipamento)
+def acao_atualizar(base_ativos, base_falhas):
+    """Opção 4: altera os campos de um ativo (requisito 5).
+
+    Enter mantém o valor atual. As mudanças vão juntas para o módulo,
+    que recusa todas se alguma for inválida.
+    """
+    print("\n--- ATUALIZAR ATIVO ---\n")
+    id_ativo = ler_inteiro("  ID do ativo: ")
+    registro = ativos.buscar_por_id(base_ativos, id_ativo)
     if registro is None:
-        print(f"\n  ! Nenhum equipamento com o ID {id_equipamento}.")
+        print(f"\n  ! Nenhum ativo com o ID {id_ativo}.")
         return
 
-    mostrar_equipamento(id_equipamento, registro)
+    mostrar_ativo(id_ativo, registro)
     print("\n  Deixe em branco para manter o valor atual.\n")
 
-    # Monto um dicionário só com o que o usuário realmente quis mudar, e
-    # entrego tudo de uma vez ao módulo, que confere tudo antes de aplicar.
-    # Assim uma alteração recusada (por exemplo hostname duplicado) não
-    # deixa metade das mudanças aplicadas.
     alteracoes = {}
 
     novo = ler_hostname(f"  Hostname [{registro['hostname']}]: ",
+                        base_ativos, ignorar_id=id_ativo,
                         obrigatorio=False)
     if novo:
         alteracoes["hostname"] = novo
 
-    novo = ler_texto(f"  Custodiante [{registro['custodiante']}]: ", obrigatorio=False)
+    novo = ler_campo(f"  Custodiante [{registro['custodiante']}]: ",
+                     obrigatorio=False)
     if novo:
         alteracoes["custodiante"] = novo
 
-    novo = ler_texto(f"  Lotação [{registro['lotacao']}]: ", obrigatorio=False)
+    novo = ler_campo(f"  Lotação [{registro['lotacao']}]: ",
+                     obrigatorio=False)
     if novo:
         alteracoes["lotacao"] = novo
 
-    novo = ler_texto(f"  Descrição [{registro['descricao']}]: ", obrigatorio=False)
+    novo = ler_campo(f"  Descrição [{registro['descricao']}]: ",
+                     obrigatorio=False)
     if novo:
         alteracoes["descricao"] = novo
 
     nova_categoria = ler_enum(
-        f"  Tipo (atual: {registro['categoria'].rotulo}) - Enter para manter:",
-        CategoriaEquipamento, opcional=True)
+        f"  Tipo (atual: {registro['categoria'].rotulo})"
+        " - Enter para manter:",
+        CategoriaAtivo, opcional=True)
     if nova_categoria is not None:
         alteracoes["categoria"] = nova_categoria
 
@@ -447,79 +386,75 @@ def acao_atualizar(base_equipamentos, base_falhas):
         return
 
     try:
-        equipamentos.atualizar(base_equipamentos, id_equipamento, alteracoes)
+        ativos.atualizar(base_ativos, id_ativo, alteracoes)
     except ValueError as erro:
         print(f"\n  ! {erro}")
         return
 
-    arquivo.salvar(base_equipamentos, base_falhas)
-    print(f"\n  Equipamento atualizado ({len(alteracoes)} campo(s)).")
+    arquivo.salvar(base_ativos, base_falhas)
+    print(f"\n  Ativo atualizado ({len(alteracoes)} campo(s)).")
 
 
-def acao_excluir(base_equipamentos, base_falhas):
-    """REQUISITO 6, com a cascata coordenada aqui."""
-    print("\n--- EXCLUIR EQUIPAMENTO ---\n")
-    id_equipamento = ler_inteiro("  ID do equipamento: ")
-    registro = equipamentos.buscar_por_id(base_equipamentos, id_equipamento)
+def acao_excluir(base_ativos, base_falhas):
+    """Opção 5: exclui o ativo e, em cascata, as falhas dele.
+
+    Requisito 6. A cascata fica aqui porque é o main.py que coordena
+    ativos.py e falhas.py.
+    """
+    print("\n--- EXCLUIR ATIVO ---\n")
+    id_ativo = ler_inteiro("  ID do ativo: ")
+    registro = ativos.buscar_por_id(base_ativos, id_ativo)
     if registro is None:
-        print(f"\n  ! Nenhum equipamento com o ID {id_equipamento}.")
+        print(f"\n  ! Nenhum ativo com o ID {id_ativo}.")
         return
 
-    mostrar_equipamento(id_equipamento, registro)
-    mostrar_falhas(base_falhas, id_equipamento)
+    mostrar_ativo(id_ativo, registro)
+    mostrar_falhas(base_falhas, id_ativo)
 
-    if not confirmar("\n  Confirma a exclusão do equipamento e das falhas dele?"):
+    if not confirmar("\n  Confirma a exclusão do ativo e das falhas dele?"):
         print("\n  Exclusão cancelada.")
         return
 
-    # A CASCATA. Nesta ordem de propósito: primeiro as falhas, depois o
-    # equipamento. Se o equipamento saísse primeiro e algo falhasse em
-    # seguida, as falhas ficariam órfãs - apontando para um ID que já não
-    # existe, e sem nenhuma tela do programa capaz de mostrá-las.
-    removidas = falhas.excluir_por_equipamento(base_falhas, id_equipamento)
-    equipamentos.excluir(base_equipamentos, id_equipamento)
+    # Falhas primeiro: se algo der errado no meio, não sobra falha
+    # apontando para ativo inexistente.
+    removidas = falhas.excluir_por_ativo(base_falhas, id_ativo)
+    ativos.excluir(base_ativos, id_ativo)
 
-    arquivo.salvar(base_equipamentos, base_falhas)
-    print(f"\n  Equipamento excluído, junto com {removidas} vulnerabilidade(s).")
+    arquivo.salvar(base_ativos, base_falhas)
+    print(f"\n  Ativo excluído, junto com {removidas} vulnerabilidade(s).")
 
 
-def acao_cadastrar_falha(base_equipamentos, base_falhas):
-    """REQUISITO 7: cadastrar vulnerabilidade a qualquer momento."""
+def acao_cadastrar_falha(base_ativos, base_falhas):
+    """Opção 6: cadastra uma vulnerabilidade num ativo (requisito 7)."""
     print("\n--- CADASTRAR VULNERABILIDADE ---\n")
-    id_equipamento = ler_inteiro("  ID do equipamento: ")
+    id_ativo = ler_inteiro("  ID do ativo: ")
 
-    # Esta é a checagem que o falhas.py não faz, porque ele não enxerga os
-    # equipamentos. É aqui que ela cabe: quem coordena os dois é o main.
-    if equipamentos.buscar_por_id(base_equipamentos, id_equipamento) is None:
-        print(f"\n  ! Nenhum equipamento com o ID {id_equipamento}.")
+    # falhas.py não recebe os ativos; a existência é conferida aqui.
+    if ativos.buscar_por_id(base_ativos, id_ativo) is None:
+        print(f"\n  ! Nenhum ativo com o ID {id_ativo}.")
         return
 
-    cadastrar_falha_para(base_equipamentos, base_falhas, id_equipamento)
+    cadastrar_falha_para(base_ativos, base_falhas, id_ativo)
 
 
-def acao_ver_falhas(base_equipamentos, base_falhas):
-    """REQUISITO 8."""
-    print("\n--- VULNERABILIDADES DE UM EQUIPAMENTO ---\n")
-    id_equipamento = ler_inteiro("  ID do equipamento: ")
-    registro = equipamentos.buscar_por_id(base_equipamentos, id_equipamento)
+def acao_ver_falhas(base_ativos, base_falhas):
+    """Opção 7: mostra o ativo e as falhas dele (requisito 8)."""
+    print("\n--- VULNERABILIDADES DE UM ATIVO ---\n")
+    id_ativo = ler_inteiro("  ID do ativo: ")
+    registro = ativos.buscar_por_id(base_ativos, id_ativo)
     if registro is None:
-        print(f"\n  ! Nenhum equipamento com o ID {id_equipamento}.")
+        print(f"\n  ! Nenhum ativo com o ID {id_ativo}.")
         return
 
-    mostrar_equipamento(id_equipamento, registro)
-    mostrar_falhas(base_falhas, id_equipamento)
+    mostrar_ativo(id_ativo, registro)
+    mostrar_falhas(base_falhas, id_ativo)
 
 
-def acao_atualizar_falha(base_equipamentos, base_falhas):
-    """
-    Correção de uma vulnerabilidade já cadastrada: descrição, categoria,
-    severidade ou situação.
+def acao_atualizar_falha(base_ativos, base_falhas):
+    """Opção 8: corrige uma vulnerabilidade já cadastrada.
 
-    Mesma mecânica da opção 4 de propósito - Enter mantém o valor atual.
-    Quem aprendeu a atualizar um equipamento já sabe usar esta tela.
-
-    Trocar a situação é um caso particular: Enter nos três primeiros campos
-    e escolha só no último.
+    Mesma mecânica da opção 4: Enter mantém o valor atual. Serve também
+    para mudar só a situação do tratamento.
     """
     print("\n--- ATUALIZAR VULNERABILIDADE ---\n")
     id_falha = ler_inteiro("  ID da vulnerabilidade: ")
@@ -529,30 +464,33 @@ def acao_atualizar_falha(base_equipamentos, base_falhas):
         return
 
     registro = base_falhas[id_falha]
-    mostrar_falha(id_falha, registro, base_equipamentos)
+    mostrar_falha(id_falha, registro, base_ativos)
     print("\n  Deixe em branco para manter o valor atual.\n")
 
     alteracoes = {}
 
-    novo = ler_texto(f"  Descrição [{registro['descricao']}]: ",
+    novo = ler_campo(f"  Descrição [{registro['descricao']}]: ",
                      obrigatorio=False)
     if novo:
         alteracoes["descricao"] = novo
 
     nova_origem = ler_enum(
-        f"  Categoria (atual: {registro['origem'].rotulo}) - Enter para manter:",
+        f"  Categoria (atual: {registro['origem'].rotulo})"
+        " - Enter para manter:",
         OrigemFalha, opcional=True)
     if nova_origem is not None:
         alteracoes["origem"] = nova_origem
 
     nova_gravidade = ler_enum(
-        f"  Severidade (atual: {registro['gravidade'].rotulo}) - Enter para manter:",
+        f"  Severidade (atual: {registro['gravidade'].rotulo})"
+        " - Enter para manter:",
         NivelGravidade, opcional=True)
     if nova_gravidade is not None:
         alteracoes["gravidade"] = nova_gravidade
 
     nova_situacao = ler_enum(
-        f"  Situação (atual: {registro['situacao'].rotulo}) - Enter para manter:",
+        f"  Situação (atual: {registro['situacao'].rotulo})"
+        " - Enter para manter:",
         SituacaoTratamento, opcional=True)
     if nova_situacao is not None:
         alteracoes["situacao"] = nova_situacao
@@ -567,18 +505,15 @@ def acao_atualizar_falha(base_equipamentos, base_falhas):
         print(f"\n  ! {erro}")
         return
 
-    arquivo.salvar(base_equipamentos, base_falhas)
+    arquivo.salvar(base_ativos, base_falhas)
     print(f"\n  Vulnerabilidade atualizada ({len(alteracoes)} campo(s)).")
 
 
-def acao_excluir_falha(base_equipamentos, base_falhas):
-    """
-    Exclui UMA vulnerabilidade - para cadastro errado ou duplicado.
+def acao_excluir_falha(base_ativos, base_falhas):
+    """Opção 9: exclui uma vulnerabilidade cadastrada por engano.
 
-    A confirmação diz explicitamente que resolver e apagar são coisas
-    diferentes. Um inventário que apaga o que foi corrigido perde o
-    histórico, e é justamente o histórico que mostra se a organização
-    trata ou acumula problema.
+    Falha resolvida deve ser marcada como Corrigida (opção 8), não
+    excluída, para não perder o histórico; a tela avisa isso.
     """
     print("\n--- EXCLUIR VULNERABILIDADE ---\n")
     id_falha = ler_inteiro("  ID da vulnerabilidade: ")
@@ -587,7 +522,7 @@ def acao_excluir_falha(base_equipamentos, base_falhas):
         print(f"\n  ! Nenhuma vulnerabilidade com o ID {id_falha}.")
         return
 
-    mostrar_falha(id_falha, base_falhas[id_falha], base_equipamentos)
+    mostrar_falha(id_falha, base_falhas[id_falha], base_ativos)
 
     print("\n  Atenção: exclua apenas cadastro errado ou duplicado.")
     print("  Se a vulnerabilidade foi resolvida, use a opção 8 e marque")
@@ -598,18 +533,15 @@ def acao_excluir_falha(base_equipamentos, base_falhas):
         return
 
     falhas.excluir(base_falhas, id_falha)
-    arquivo.salvar(base_equipamentos, base_falhas)
+    arquivo.salvar(base_ativos, base_falhas)
     print("\n  Vulnerabilidade excluída.")
 
 
-def acao_pendentes(base_equipamentos, base_falhas):
-    """
-    Relatório de pendentes (opção 10) - além do enunciado.
+def acao_pendentes(base_ativos, base_falhas):
+    """Opção 10: lista as falhas pendentes de todos os ativos.
 
-    As vulnerabilidades que ainda pedem ação, de TODOS os equipamentos, da
-    mais grave para a menos. É a primeira pergunta de quem cuida da
-    segurança: o que corrigir agora? Sem este relatório, a resposta exigiria
-    abrir a ficha de cada equipamento, um por um.
+    Vai além do enunciado: mostra o que corrigir primeiro sem abrir a
+    ficha de cada ativo.
     """
     print("\n--- VULNERABILIDADES PENDENTES ---")
     pendentes = falhas.listar_pendentes(base_falhas)
@@ -619,22 +551,14 @@ def acao_pendentes(base_equipamentos, base_falhas):
         return
 
     print(f"\n  {len(pendentes)} aberta(s) ou em tratamento, da mais grave:\n")
-    imprimir_falhas(pendentes, base_equipamentos)
+    imprimir_falhas(pendentes, base_ativos)
 
 
-# ===========================================================================
-# O MENU
-#
-# Uso um DICIONÁRIO para ligar o número digitado à função correspondente,
-# em vez de uma sequência de if/elif. Vantagens: ligar uma opção nova
-# custa uma linha aqui e um print no exibir_menu() (foi assim que a 10
-# entrou), e não existe risco de esquecer um elif no meio da cadeia.
-#
-# É, de quebra, um segundo uso de dicionário no projeto (requisito 9) - aqui
-# não para guardar dados, mas para escolher comportamento.
-# ===========================================================================
+# Número da opção -> função que a executa. Substitui uma cadeia de
+# if/elif: ligar uma opção nova custa uma linha aqui e um print em
+# exibir_menu().
 ACOES = {
-    1: acao_cadastrar_equipamento,
+    1: acao_cadastrar_ativo,
     2: acao_listar_todos,
     3: acao_buscar,
     4: acao_atualizar,
@@ -648,16 +572,15 @@ ACOES = {
 
 
 def exibir_menu():
-    # Números alinhados à direita, como em qualquer coluna de números: com a
-    # opção 10, o traço continua na mesma posição em todas as linhas.
+    """Mostra o menu, com os números alinhados à direita."""
     print("\n" + "=" * 62)
-    print("   1 - Cadastrar equipamento")
-    print("   2 - Listar todos os equipamentos")
-    print("   3 - Buscar equipamento (por ID, hostname, responsável...)")
-    print("   4 - Atualizar equipamento")
-    print("   5 - Excluir equipamento (e suas vulnerabilidades)")
+    print("   1 - Cadastrar ativo")
+    print("   2 - Listar todos os ativos")
+    print("   3 - Buscar ativo (por ID, hostname, responsável...)")
+    print("   4 - Atualizar ativo")
+    print("   5 - Excluir ativo (e suas vulnerabilidades)")
     print("   6 - Cadastrar vulnerabilidade")
-    print("   7 - Ver vulnerabilidades de um equipamento")
+    print("   7 - Ver vulnerabilidades de um ativo")
     print("   8 - Atualizar vulnerabilidade")
     print("   9 - Excluir vulnerabilidade")
     print("  10 - Vulnerabilidades pendentes (todas, da mais grave)")
@@ -666,16 +589,14 @@ def exibir_menu():
 
 
 def main():
+    """Carrega a base e repete o menu até o usuário escolher 0."""
     print("\n" + "=" * 62)
     print("  INVENTÁRIO DE ATIVOS E VULNERABILIDADES")
     print("=" * 62)
 
-    # Carrego a base UMA vez, no início. Durante a execução tudo acontece na
-    # memória (rápido), e cada alteração é gravada logo em seguida - assim
-    # um fechamento inesperado não leva o trabalho junto. A única outra
-    # carga acontece depois de um erro no meio de uma ação (ver abaixo).
-    base_equipamentos, base_falhas = arquivo.carregar()
-    print(f"\n  Base carregada: {len(base_equipamentos)} equipamento(s), "
+    # A base é lida uma vez; cada alteração é gravada na hora.
+    base_ativos, base_falhas = arquivo.carregar()
+    print(f"\n  Base carregada: {len(base_ativos)} ativo(s), "
           f"{len(base_falhas)} vulnerabilidade(s).")
 
     while True:
@@ -692,27 +613,15 @@ def main():
             continue
 
         try:
-            acao(base_equipamentos, base_falhas)
+            acao(base_ativos, base_falhas)
         except EOFError:
-            # Ctrl+Z (Windows) ou Ctrl+D no meio de uma ação: o operador quer
-            # sair. Não é erro inesperado - deixo subir até o encerramento
-            # limpo no fim do arquivo.
-            raise
+            raise  # Ctrl+Z ou Ctrl+D: encerramento limpo, no fim do arquivo
         except Exception as erro:
-            # Rede de segurança. Se algo inesperado escapar de uma ação, o
-            # programa avisa e volta ao menu, em vez de fechar e perder a
-            # sessão do usuário (requisito 1: "evitar falhas").
-            #
-            # Capturar Exception assim é abrangente demais para uma
-            # biblioteca, porque esconderia bugs. Num programa de menu é o
-            # oposto: fechar na cara do usuário é pior do que continuar.
+            # Ponto de isolamento (requisito 1): um erro inesperado numa
+            # ação não derruba o programa. A base é recarregada porque
+            # a ação pode ter parado entre a memória e o disco.
             print(f"\n  ! Erro inesperado: {erro}")
-            # A ação pode ter parado no meio: dicionário já alterado e
-            # gravação não feita (disco cheio, arquivo travado por outro
-            # programa). Volto ao que está no disco, a única versão garantida.
-            # Sem isso, a tela mostraria um cadastro que não existe no
-            # arquivo - e a próxima gravação bem-sucedida o salvaria calada.
-            base_equipamentos, base_falhas = arquivo.carregar()
+            base_ativos, base_falhas = arquivo.carregar()
             print("  ! Base recarregada do disco: o que não chegou a ser "
                   "gravado foi descartado.")
 
@@ -721,16 +630,11 @@ if __name__ == "__main__":
     try:
         main()
     except arquivo.BaseInvalida as erro:
-        # A base existe mas não pode ser lida - corrompida, adulterada ou
-        # bloqueada por outro programa. Paro de propósito: se eu seguisse com
-        # base vazia, a primeira gravação sobrescreveria o arquivo e o
-        # estrago viraria permanente.
+        # Não abre base ruim: a primeira gravação apagaria o original.
         print(f"\n  ! Não foi possível carregar a base de dados: {erro}")
         print(f"  ! Arquivo: {arquivo.ARQUIVO_DADOS}")
         print("  ! O programa para aqui, para não sobrescrever dados bons.")
         print("  ! Corrija o arquivo, ou mova-o para fora da pasta")
         print("    e o programa começa uma base nova.\n")
     except (KeyboardInterrupt, EOFError):
-        # Ctrl+C ou fim de entrada: encerra limpo em vez de despejar um
-        # traceback vermelho de dez linhas.
         print("\n\n  Encerrado pelo usuário.\n")

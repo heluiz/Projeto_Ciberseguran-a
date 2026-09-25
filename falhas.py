@@ -1,102 +1,59 @@
-"""
-falhas.py
----------
-Operações sobre as vulnerabilidades associadas aos equipamentos.
+"""Operações sobre as vulnerabilidades (falhas) dos ativos.
 
-Mesma regra do equipamentos.py: nenhum input(), print() só no bloco de
-teste, nenhuma gravação em disco. Recebe dados, mexe no dicionário, devolve
-resultado.
-
-Atende aos requisitos 7 e 8 e à parte de cascata do requisito 6. Além do
-enunciado, monta a lista de pendentes do relatório da opção 10.
+Como ativos.py, não lê do teclado nem grava em disco. Atende aos
+requisitos 7 e 8, à exclusão em cascata do requisito 6 e ao
+relatório de pendentes da opção 10.
 """
 
 from arquivo import proximo_id_falha
 from classificacoes import SituacaoTratamento
 import formatacao
 
-
-# Campos que podem ser corrigidos depois do cadastro.
-# O equipamento_id NÃO está aqui de propósito: mover uma vulnerabilidade de um
-# equipamento para outro não é correção, é outro cadastro. Se foi lançada no
-# equipamento errado, o certo é excluir e cadastrar no lugar certo.
+# O ativo_id fica de fora: mudar a falha de ativo é um novo cadastro.
 CAMPOS_EDITAVEIS = ("descricao", "origem", "gravidade", "situacao")
 
 
-# ===========================================================================
-# REQUISITO 7 - cadastro de vulnerabilidade
-# ===========================================================================
-def cadastrar(falhas, equipamento_id, descricao, origem, gravidade, situacao):
-    """
-    Registra uma vulnerabilidade e devolve o id gerado.
+def cadastrar(falhas, ativo_id, descricao, origem, gravidade, situacao):
+    """Registra uma falha e devolve o id gerado (requisito 7).
 
-    Os quatro campos que o enunciado exige estão aqui: descrição, categoria
-    (que eu chamei de origem), severidade (gravidade) e status de tratamento
-    (situação).
-
-    Repare que esta função NÃO confere se o equipamento_id existe. Ela não
-    teria como: este módulo não enxerga o dicionário de equipamentos, de
-    propósito. Quem confere antes de chamar é o main.py.
-
-    Por que não receber os equipamentos aqui só para conferir? Porque aí os
-    dois módulos ficariam amarrados um ao outro, e eu não conseguiria testar
-    as falhas sem montar equipamentos junto - que é exatamente o que faço no
-    bloco de teste no fim deste arquivo.
+    Não confere se o ativo existe: este módulo não recebe os ativos, de
+    propósito, para ser testado sozinho. Quem confere é o main.py.
     """
     id_novo = proximo_id_falha(falhas)
     falhas[id_novo] = {
-        "equipamento_id": equipamento_id,
-        "descricao":      formatacao.frase(descricao),
-        "origem":         origem,
-        "gravidade":      gravidade,
-        "situacao":       situacao,
+        "ativo_id": ativo_id,
+        "descricao": formatacao.frase(descricao),
+        "origem": origem,
+        "gravidade": gravidade,
+        "situacao": situacao,
     }
     return id_novo
 
 
-# ===========================================================================
-# REQUISITO 8 - visualizar as vulnerabilidades de um equipamento
-# ===========================================================================
-def listar_por_equipamento(falhas, equipamento_id):
-    """
-    Devolve uma LISTA de pares (id, registro), da mais grave para a menos.
+def listar_por_ativo(falhas, ativo_id):
+    """Devolve as falhas do ativo, da mais grave para a menos grave.
 
-    Lista vazia significa "sem vulnerabilidades registradas". A mensagem em
-    si sai no main.py - este módulo não fala com o usuário.
-
-    A ordenação usa .gravidade.value, e é aqui que a decisão lá do
-    classificacoes.py se paga: numerei BAIXA=1 até CRITICA=4 justamente para
-    que a ordem dos números significasse ordem de gravidade. Se eu tivesse
-    numerado em ordem alfabética, esta ordenação não faria sentido nenhum.
+    Cada item é um par (id, registro); lista vazia significa ativo sem
+    vulnerabilidades registradas (requisito 8).
     """
     encontradas = []
     for id_falha, registro in falhas.items():
-        if registro["equipamento_id"] == equipamento_id:
+        if registro["ativo_id"] == ativo_id:
             encontradas.append((id_falha, registro))
-
-    # key= diz ao sort qual valor usar para comparar. O 'lambda' é uma função
-    # curta escrita na própria linha: recebe um par (id, registro) e devolve
-    # o número da gravidade. reverse=True põe a mais grave primeiro - quem
-    # abre a ficha de um equipamento quer ver o problema crítico no topo.
     encontradas.sort(key=lambda par: par[1]["gravidade"].value, reverse=True)
     return encontradas
 
 
-# Situações que ainda pedem ação. Corrigida e Aceita como risco ficam de
-# fora: na primeira o problema acabou; na segunda, alguém com autoridade
-# decidiu conviver com ele - e isso já está registrado.
-SITUACOES_PENDENTES = (SituacaoTratamento.ABERTA, SituacaoTratamento.EM_TRATAMENTO)
+# Corrigida e aceita como risco já foram decididas; o resto pede ação.
+SITUACOES_PENDENTES = (SituacaoTratamento.ABERTA,
+                       SituacaoTratamento.EM_TRATAMENTO)
 
 
 def listar_pendentes(falhas):
-    """
-    Devolve os pares (id, registro) das vulnerabilidades pendentes de TODOS
-    os equipamentos, da mais grave para a menos - a base do relatório da
-    opção 10, que vai além do enunciado.
+    """Devolve as falhas pendentes de todos os ativos, da mais grave.
 
-    Mesma ordenação do listar_por_equipamento(): gravidade decrescente e,
-    no empate, a ordem de cadastro. Isso porque o sort() do Python é
-    estável: não troca de lugar dois itens com a mesma gravidade.
+    Base do relatório da opção 10. No empate de gravidade, mantém a
+    ordem de cadastro, porque o sort() do Python é estável.
     """
     pendentes = [(id_falha, registro)
                  for id_falha, registro in falhas.items()
@@ -106,34 +63,22 @@ def listar_pendentes(falhas):
 
 
 def atualizar(falhas, id_falha, alteracoes):
-    """
-    'alteracoes' é um dicionário {campo: novo_valor}. Só os campos presentes
-    mudam; o resto fica como estava. Devolve True se atualizou, False se o id
-    não existe, e levanta ValueError num campo protegido - aí nada muda.
+    """Aplica as alterações {campo: valor} à falha.
 
-    Mesma forma da atualização de equipamentos, de propósito: duas telas que
-    fazem a mesma coisa devem funcionar do mesmo jeito.
-
-    Por que isto existe: sem ele, um erro de digitação no cadastro só teria
-    conserto excluindo o equipamento inteiro - e levando junto as outras
-    vulnerabilidades dele. Pior ainda com a severidade: uma falha lançada
-    como Média quando era Crítica distorce a priorização, que é a razão de
-    ser do inventário.
+    Devolve True se atualizou e False se o id não existe. Levanta
+    ValueError em campo protegido; nesse caso nada muda.
     """
     registro = falhas.get(id_falha)
     if registro is None:
         return False
 
-    # Primeiro confiro, depois aplico - o mesmo tudo ou nada da atualização
-    # de equipamentos.
+    # Confere tudo antes de aplicar, como na atualização de ativos.
     for campo in alteracoes:
         if campo not in CAMPOS_EDITAVEIS:
             raise ValueError(f"Campo não editável: '{campo}'")
 
     for campo, valor in alteracoes.items():
         if campo == "descricao":
-            # Mesma regra de frase do cadastro: só a primeira letra em
-            # maiúscula, preservando acrônimos como RDP ou CPD.
             valor = formatacao.frase(valor)
         registro[campo] = valor
 
@@ -141,16 +86,10 @@ def atualizar(falhas, id_falha, alteracoes):
 
 
 def excluir(falhas, id_falha):
-    """
-    Apaga UMA vulnerabilidade. Devolve True se apagou, False se não existia.
+    """Exclui uma falha e devolve False se o id não existia.
 
-    Quando apagar é legítimo? Só quando o registro nunca deveria ter existido:
-    cadastro errado ou duplicado. Vulnerabilidade resolvida não se apaga -
-    marca-se como Corrigida. Apagar destruiria o histórico, e saber que
-    aquela máquina já teve senha padrão é informação útil.
-
-    Quem deixa essa distinção explícita para o usuário é o main.py, no texto
-    da confirmação.
+    Serve para cadastro errado ou duplicado. Falha resolvida não se
+    exclui: marca-se como Corrigida, para manter o histórico.
     """
     if id_falha not in falhas:
         return False
@@ -158,25 +97,17 @@ def excluir(falhas, id_falha):
     return True
 
 
-# ===========================================================================
-# REQUISITO 6 - a cascata: ao excluir o equipamento, as falhas vão junto
-# ===========================================================================
-def excluir_por_equipamento(falhas, equipamento_id):
-    """
-    Apaga todas as falhas de um equipamento e devolve quantas foram apagadas.
+def excluir_por_ativo(falhas, ativo_id):
+    """Exclui as falhas do ativo e devolve quantas foram excluídas.
 
-    Por que montar a lista de ids ANTES de apagar, em vez de apagar dentro do
-    laço? Porque apagar chaves de um dicionário enquanto se percorre ele
-    levanta RuntimeError em Python. Primeiro decido o que sai, depois apago.
-
-    As três linhas abaixo são uma "list comprehension": um laço escrito de
-    forma compacta. Lê-se de trás para frente - "para cada par no dicionário,
-    SE o equipamento_id bater, guarde o id_falha".
+    É a cascata do requisito 6. Os ids são separados antes porque
+    apagar chaves de um dicionário enquanto se percorre ele levanta
+    RuntimeError.
     """
     ids_para_remover = [
         id_falha
         for id_falha, registro in falhas.items()
-        if registro["equipamento_id"] == equipamento_id
+        if registro["ativo_id"] == ativo_id
     ]
 
     for id_falha in ids_para_remover:
@@ -185,9 +116,7 @@ def excluir_por_equipamento(falhas, equipamento_id):
     return len(ids_para_remover)
 
 
-# ===========================================================================
 # Teste: requisitos 7, 8 e a cascata do 6, sem ninguém digitar nada.
-# ===========================================================================
 if __name__ == "__main__":
     from classificacoes import OrigemFalha, NivelGravidade
 
@@ -209,44 +138,47 @@ if __name__ == "__main__":
     print(f"Cadastradas {len(falhas)} falhas.")
 
     # --- Requisito 8 ---
-    print("\nFalhas do equipamento 1 (mais grave primeiro):")
-    for id_falha, registro in listar_por_equipamento(falhas, 1):
+    print("\nFalhas do ativo 1 (mais grave primeiro):")
+    for id_falha, registro in listar_por_ativo(falhas, 1):
         print(f"  [{id_falha}] {registro['gravidade'].rotulo:8} | "
               f"{registro['situacao'].rotulo:18} | {registro['descricao']}")
 
-    vazio = listar_por_equipamento(falhas, 99)
-    print(f"\nFalhas do equipamento 99: {vazio}")
-    print("  (lista vazia = o menu vai dizer 'sem vulnerabilidades registradas')")
+    vazio = listar_por_ativo(falhas, 99)
+    print(f"\nFalhas do ativo 99: {vazio}")
+    print("  (lista vazia = o menu vai dizer "
+          "'sem vulnerabilidades registradas')")
 
-    # --- correção de um cadastro errado ---
-    atualizar(falhas, 3, {"gravidade": NivelGravidade.CRITICA,
-                          "descricao": "Senha padrão de fábrica na interface web"})
+    # --- Correção de um cadastro errado ---
+    atualizar(falhas, 3, {
+        "gravidade": NivelGravidade.CRITICA,
+        "descricao": "Senha padrão de fábrica na interface web",
+    })
     print(f"\nFalha 3 corrigida: {falhas[3]['gravidade'].rotulo} | "
           f"{falhas[3]['descricao']}")
 
     try:
-        atualizar(falhas, 3, {"equipamento_id": 99})
+        atualizar(falhas, 3, {"ativo_id": 99})
     except ValueError as erro:
         print(f"Campo protegido: {erro}")
 
-    # --- acompanhamento do tratamento ---
+    # --- Acompanhamento do tratamento ---
     atualizar(falhas, 1, {"situacao": SituacaoTratamento.CORRIGIDA})
     print(f"Falha 1 agora está: {falhas[1]['situacao'].rotulo}")
 
-    # --- relatório de pendentes (opção 10) ---
+    # --- Relatório de pendentes (opção 10) ---
     pendentes = [id_falha for id_falha, _ in listar_pendentes(falhas)]
     print(f"Pendentes, da mais grave: {pendentes}  (a 1 saiu: foi corrigida)")
     assert pendentes == [2, 3, 4], "o relatório de pendentes errou"
 
-    # --- exclusão de uma vulnerabilidade só ---
+    # --- Exclusão de uma vulnerabilidade só ---
     print(f"\nExcluindo a falha 3: {excluir(falhas, 3)}")
     print(f"Excluindo a falha 3 de novo: {excluir(falhas, 3)}  "
           f"(False = já não existia)")
     print(f"Restaram os ids: {sorted(falhas.keys())}")
 
     # --- Requisito 6, cascata ---
-    removidas = excluir_por_equipamento(falhas, 1)
-    print(f"\nExcluídas em cascata do equipamento 1: {removidas}")
-    print(f"Restaram os ids: {list(falhas.keys())}  (a falha do equipamento 2)")
+    removidas = excluir_por_ativo(falhas, 1)
+    print(f"\nExcluídas em cascata do ativo 1: {removidas}")
+    print(f"Restaram os ids: {list(falhas.keys())}  (a falha do ativo 2)")
 
     print("\nOK - requisitos 7, 8 e a cascata do 6 exercitados.")
