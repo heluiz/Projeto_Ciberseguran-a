@@ -18,6 +18,9 @@ cd Projeto_Ciberseguran-a
 python main.py
 ```
 
+O programa começa com a base vazia. Para testá-lo com dados fictícios, veja a
+[base de exemplo](#base-de-exemplo).
+
 ## Estrutura
 
 O projeto é dividido em seis módulos, cada um com uma responsabilidade única.
@@ -147,7 +150,11 @@ pydocstyle .
   A regra só formata quando o operador escreveu tudo em caixa alta ou tudo em
   baixa; texto com maiúsculas e minúsculas misturadas é respeitado, o que
   preserva acrônimos no meio do texto ("Setor de TI", "porta RDP exposta") e
-  nomes como iDRAC e pfSense.
+  nomes como iDRAC e pfSense. Quando formata, a regra devolve as siglas
+  conhecidas à grafia certa: sem isso, "DEAM" viraria "Deam" e "1ª DP",
+  "1ª Dp". Elas ficam na lista `SIGLAS`, em `formatacao.py`, assim como as
+  partículas "de" e "da" ficam na lista que as mantém em minúscula. Sigla
+  fora da lista não tem como ser reconhecida.
 - **Correção e exclusão de vulnerabilidades.** O enunciado pede apenas o
   cadastro. Sem edição, um erro de digitação na severidade — que distorce a
   priorização, razão de ser do inventário — só teria conserto excluindo o
@@ -187,6 +194,23 @@ Os dados ficam em `inventario.json`, criado ao lado do código na primeira
 gravação. O arquivo não é versionado: o repositório guarda código, não dado
 gerado — e, num sistema de segurança, o inventário de vulnerabilidades é
 justamente o que não se publica.
+
+### Base de exemplo
+
+Para testar o programa com dados, o repositório traz `inventario_exemplo.json`:
+76 ativos e 88 vulnerabilidades, distribuídos pelos setores da 1ª DRPC
+Uberlândia. Os setores e os sistemas citados existem, mas hostnames,
+vulnerabilidades e situações são fictícios e não descrevem a rede real. Para
+usar o exemplo, copie-o por cima da base (a base atual é substituída):
+
+```
+copy inventario_exemplo.json inventario.json
+```
+
+No Linux e no macOS, o comando é `cp` em vez de `copy`. O exemplo fica num
+arquivo à parte, e não no próprio `inventario.json`, porque o programa regrava
+a base a cada alteração: versionada, ela levaria para o repositório cada teste
+feito, e uma base real poderia ser publicada por engano.
 
 ## Desenvolvimento
 
