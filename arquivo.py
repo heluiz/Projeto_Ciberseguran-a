@@ -75,17 +75,27 @@ def salvar(ativos, falhas):
     os.replace(temporario, ARQUIVO_DADOS)  # troca atômica
 
 
-def _exige_texto(registro, campos):
-    """Levanta TypeError se algum dos campos não for texto.
+def _exige_texto(registro, campos, origem):
+    """Levanta erro se algum dos campos não for texto visível.
 
-    Assim um valor nulo no arquivo é recusado na carga, e não numa
-    busca mais tarde.
+    TypeError se o valor não for texto: um nulo no arquivo é recusado
+    na carga, e não numa busca mais tarde. ValueError se o texto tiver
+    caractere de controle, como ESC: é a mesma regra da digitação, que
+    vale também aqui porque o arquivo pode ser editado fora do
+    programa, e o caractere seria enviado ao terminal toda vez que o
+    texto aparecesse na tela. origem ("ativo 3") vai na mensagem.
     """
     for campo in campos:
-        if not isinstance(registro[campo], str):
+        valor = registro[campo]
+        if not isinstance(valor, str):
             raise TypeError(
-                f"campo '{campo}' deveria ser texto, "
-                f"veio {type(registro[campo]).__name__}")
+                f"{origem}: campo '{campo}' deveria ser texto, "
+                f"veio {type(valor).__name__}")
+        if not valor.isprintable():
+            invisivel = next(c for c in valor if not c.isprintable())
+            raise ValueError(
+                f"{origem}: campo '{campo}' tem caractere de controle "
+                f"({invisivel!r})")
 
 
 def _exige_inteiro(valor, nome):
@@ -150,7 +160,7 @@ def carregar():
                 "categoria": CategoriaAtivo(registro["categoria"]),
             }
             _exige_texto(item, ("hostname", "custodiante",
-                                "lotacao", "descricao"))
+                                "lotacao", "descricao"), f"ativo {chave}")
             ativos[_chave_para_id(chave)] = item
 
         falhas = {}
@@ -162,7 +172,7 @@ def carregar():
                 "gravidade": NivelGravidade(registro["gravidade"]),
                 "situacao": SituacaoTratamento(registro["situacao"]),
             }
-            _exige_texto(item, ("descricao",))
+            _exige_texto(item, ("descricao",), f"vulnerabilidade {chave}")
             _exige_inteiro(item["ativo_id"], "ativo_id")
             # Integridade referencial: falha sem ativo seria invisível.
             if item["ativo_id"] not in ativos:
@@ -277,6 +287,9 @@ if __name__ == "__main__":
                                      "ultimo_id_ativo": 10.0}).encode(),
         "falha órfã": json.dumps({"ativos": {"1": bom},
                                   "falhas": {"1": orfa}}).encode(),
+        # ESC gravado no arquivo mexeria no terminal ao ser exibido.
+        "ESC no hostname": json.dumps({"ativos": {"1": dict(
+            bom, hostname="PC-01\u001b[2J")}, "falhas": {}}).encode(),
         # O "ó" em cp1252 é um byte inválido em UTF-8.
         "salva em ANSI": '{"lotacao": "Cartório"}'.encode("cp1252"),
     }
